@@ -9,6 +9,7 @@ import { UsersModule } from "./modules/users/users.module";
 import { TransactionsModule } from "./modules/transactions/transactions.module";
 import { AppConfigModule } from "./modules/app-config/app-config.module";
 import { GoldModule } from "./modules/gold/gold.module";
+import { NotesModule } from "./modules/notes/notes.module";
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { GoldModule } from "./modules/gold/gold.module";
     TransactionsModule,
     AppConfigModule,
     GoldModule,
+    NotesModule,
   ],
 })
 export class AppModule {}

@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Req, UseGuards, Query, Patch, Param } from '@nestjs/common';
+import { Controller, Post, Get, Body, Req, UseGuards, Query, Patch, Param, Delete } from '@nestjs/common';
 import { TransactionsService } from './transactions.service';
 import { AuthGuard } from '@nestjs/passport';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
@@ -27,11 +27,15 @@ export class TransactionsController {
     @Req() req,
     @Query('month') month?: string,
     @Query('year') year?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('order') order?: string,
   ) {
     return this.transactionsService.findAll(
       req.user.userId,
       month ? parseInt(month) : undefined,
       year ? parseInt(year) : undefined,
+      sortBy,
+      order,
     );
   }
 
@@ -43,5 +47,10 @@ export class TransactionsController {
   @Get('categories')
   getCategories() {
     return this.transactionsService.getCategories();
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string, @Req() req) {
+    return this.transactionsService.remove(id, req.user.userId);
   }
 }

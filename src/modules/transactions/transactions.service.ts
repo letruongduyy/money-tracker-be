@@ -30,7 +30,7 @@ export class TransactionsService {
     );
   }
 
-  findAll(userId: string, month?: number, year?: number) {
+  findAll(userId: string, month?: number, year?: number, sortBy: string = 'date', order: string = 'desc') {
     const filter: any = { user: userId };
 
     if (year) {
@@ -45,7 +45,10 @@ export class TransactionsService {
       };
     }
 
-    return this.transactionModel.find(filter).sort({ date: -1 });
+    const sortOrder = order === 'asc' ? 1 : -1;
+    const sortObj = { [sortBy]: sortOrder };
+
+    return this.transactionModel.find(filter).sort(sortObj as any);
   }
 
   getCategories() {
@@ -76,5 +79,9 @@ export class TransactionsService {
       expense,
       balance: income - expense,
     };
+  }
+
+  async remove(id: string, userId: string) {
+    return this.transactionModel.deleteOne({ _id: id, user: userId }).exec();
   }
 }

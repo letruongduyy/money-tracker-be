@@ -13,4 +13,9 @@ export class GoldController {
     const daysNum = days ? parseInt(days, 10) : 7;
     return this.goldService.getGoldPrices(type, daysNum);
   }
+
+  @Get("currency")
+  async getCurrencyRates() {
+    return this.goldService.getCurrencyRates();
+  }
 }
