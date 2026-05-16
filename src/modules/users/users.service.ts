@@ -39,6 +39,6 @@ export class UsersService {
   }
 
   async updateAvatar(userId: string, avatarUrl: string) {
-    return this.userModel.findByIdAndUpdate(userId, { avatar: avatarUrl }, { new: true }).select('-password');
+    return this.userModel.findByIdAndUpdate(userId, { avatar: avatarUrl }, { returnDocument: 'after' }).select('-password');
   }
 }

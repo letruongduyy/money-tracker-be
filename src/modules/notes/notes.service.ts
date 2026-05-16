@@ -22,7 +22,7 @@ export class NotesService {
     const updatedNote = await this.noteModel.findOneAndUpdate(
       { _id: new Types.ObjectId(id), user: new Types.ObjectId(userId) },
       { $set: updateNoteDto },
-      { new: true },
+      { returnDocument: 'after' },
     ).exec();
 
     if (!updatedNote) {

@@ -11,6 +11,7 @@ import { AppConfigModule } from "./modules/app-config/app-config.module";
 import { GoldModule } from "./modules/gold/gold.module";
 import { NotesModule } from "./modules/notes/notes.module";
 import { AssetsModule } from "./modules/assets/assets.module";
+import { AiModule } from "./modules/ai/ai.module";
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { AssetsModule } from "./modules/assets/assets.module";
     GoldModule,
     NotesModule,
     AssetsModule,
+    AiModule,
   ],
 })
 export class AppModule {}
