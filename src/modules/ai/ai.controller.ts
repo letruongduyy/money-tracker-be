@@ -1,23 +1,19 @@
-import {
-  Controller,
-  Post,
-  Body,
-  HttpCode,
-  HttpStatus,
-  UseGuards,
-} from "@nestjs/common";
+import { Body, Controller, Post, Req, UseGuards } from "@nestjs/common";
+import { AuthGuard } from "@nestjs/passport";
 import { AiService } from "./ai.service";
 
 @Controller("ai")
+@UseGuards(AuthGuard("jwt"))
 export class AiController {
   constructor(private readonly aiService: AiService) {}
 
   @Post("parse")
-  @HttpCode(HttpStatus.OK)
-  async parseTransaction(@Body("text") text: string) {
+  async parseTransaction(@Body("text") text: string, @Req() req: any) {
     if (!text || text.trim() === "") {
       return { status: false, message: "Text is required" };
     }
-    return this.aiService.parseTransactionFromNote(text);
+
+    const userId = req.user?.userId;
+    return this.aiService.parseTransactionFromNote(text, userId);
   }
 }
