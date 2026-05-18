@@ -18,6 +18,10 @@ export class CreateAssetDto {
   @IsOptional()
   @IsString()
   symbol?: string;
+
+  @IsOptional()
+  @IsString()
+  unit?: string;
 }
 
 export class UpdateAssetDto {
@@ -36,4 +40,8 @@ export class UpdateAssetDto {
   @IsOptional()
   @IsString()
   symbol?: string;
+
+  @IsOptional()
+  @IsString()
+  unit?: string;
 }

@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseInterceptors, UploadedFile, BadRequestException, Patch, UseGuards, Req } from "@nestjs/common";
+import { Controller, Post, Body, UseInterceptors, UploadedFile, BadRequestException, Patch, UseGuards, Req, Get } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { diskStorage } from "multer";
@@ -59,5 +59,11 @@ export class UsersController {
     }
     const avatarUrl = `${req.protocol}://${req.get('host')}/uploads/${file.filename}`;
     return this.usersService.updateAvatar(req.user.userId, avatarUrl);
+  }
+
+  @Get("me")
+  @UseGuards(AuthGuard('jwt'))
+  async getProfile(@Req() req) {
+    return this.usersService.getProfile(req.user.userId);
   }
 }

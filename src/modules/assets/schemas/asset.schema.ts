@@ -26,6 +26,9 @@ export class Asset {
   @Prop()
   symbol?: string; // 'USD', 'SJC'
 
+  @Prop()
+  unit?: string; // 'tael', 'chi'
+
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   user: Types.ObjectId;
 }
