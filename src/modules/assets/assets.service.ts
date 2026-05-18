@@ -39,7 +39,6 @@ export class AssetsService {
           existing.name = 'SJ9999';
         }
         
-        existing.updatedAt = new Date();
         return existing.save();
       }
     }
@@ -59,7 +58,6 @@ export class AssetsService {
         existing.amount = existing.amount + data.amount;
         existing.symbol = cleanSymbol;
         existing.name = cleanSymbol;
-        existing.updatedAt = new Date();
         return existing.save();
       }
     }
@@ -73,7 +71,6 @@ export class AssetsService {
       });
       if (existing) {
         existing.amount = existing.amount + data.amount;
-        existing.updatedAt = new Date();
         return existing.save();
       }
     }
