@@ -27,10 +27,10 @@ export class UsersController {
       cb(null, true);
     }
   }))
-  register(@Body() body: CreateUserDto, @UploadedFile() file?: Express.Multer.File) {
+  register(@Req() req, @Body() body: CreateUserDto, @UploadedFile() file?: Express.Multer.File) {
     console.log(file);
     if (file) {
-      body.avatar = `http://localhost:3000/uploads/${file.filename}`;
+      body.avatar = `${req.protocol}://${req.get('host')}/uploads/${file.filename}`;
     }
     return this.usersService.create(body);
   }
@@ -57,7 +57,7 @@ export class UsersController {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
-    const avatarUrl = `http://localhost:3000/uploads/${file.filename}`;
+    const avatarUrl = `${req.protocol}://${req.get('host')}/uploads/${file.filename}`;
     return this.usersService.updateAvatar(req.user.userId, avatarUrl);
   }
 }
