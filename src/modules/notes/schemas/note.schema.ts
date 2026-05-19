@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import mongoose, { Document, Types } from 'mongoose';
 
 export type NoteDocument = Note & Document;
 
@@ -8,11 +8,11 @@ export class Note {
   @Prop()
   localId?: string;
 
-  @Prop({ required: true })
+  @Prop({ default: '' })
   title: string;
 
-  @Prop()
-  content: string;
+  @Prop({ type: mongoose.Schema.Types.Mixed })
+  content: any;
 
   @Prop({ default: false })
   isList: boolean;

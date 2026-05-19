@@ -6,11 +6,11 @@ export class CreateNoteDto {
   localId?: string;
 
   @IsString()
-  title: string;
-
-  @IsString()
   @IsOptional()
-  content?: string;
+  title?: string;
+
+  @IsOptional()
+  content?: any;
 
   @IsBoolean()
   @IsOptional()
