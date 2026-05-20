@@ -26,6 +26,8 @@ export const TransactionCategories = {
     'health',
     'education',
     'baby',
+    'give_someone_money',
+    'save_money',
     'other',
   ],
 };

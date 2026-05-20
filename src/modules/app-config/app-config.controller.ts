@@ -35,6 +35,8 @@ export class AppConfigController {
       health: "Sức khỏe",
       education: "Giáo dục",
       baby: "Em bé",
+      give_someone_money: "Cho/tặng tiền",
+      save_money: "Tiết kiệm",
     };
 
     const formatCategories = Object.entries(TransactionCategories).reduce(

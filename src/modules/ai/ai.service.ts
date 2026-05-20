@@ -23,7 +23,7 @@ export class AiService {
       const paymentMethods = "cash, card, e_wallet, bank_transfer";
       const categories = `
         INCOME Categories: salary, freelance, gift, investment, other
-        EXPENSE Categories: food_and_dining, transport, shopping, entertainment, bills_and_utilities, health, education, baby, other
+        EXPENSE Categories: food_and_dining, transport, shopping, entertainment, bills_and_utilities, health, education, baby, give_someone_money, save_money, other
       `;
 
       const prompt = `
