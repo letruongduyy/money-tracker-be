@@ -49,15 +49,11 @@ export class UsersService {
   }
 
   async addFcmToken(userId: string, token: string): Promise<void> {
-    await this.userModel.findByIdAndUpdate(userId, {
-      $addToSet: { fcmTokens: token },
-    });
+    await this.userModel.findByIdAndUpdate(userId, { fcmToken: token });
   }
 
-  async removeFcmToken(userId: string, token: string): Promise<void> {
-    await this.userModel.findByIdAndUpdate(userId, {
-      $pull: { fcmTokens: token },
-    });
+  async removeFcmToken(userId: string): Promise<void> {
+    await this.userModel.findByIdAndUpdate(userId, { fcmToken: '' });
   }
 
   async getProfile(userId: string) {

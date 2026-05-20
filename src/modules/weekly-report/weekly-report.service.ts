@@ -36,8 +36,8 @@ export class WeeklyReportService {
 
     // Fetch all users that have at least one FCM token
     const users = await this.userModel
-      .find({ fcmTokens: { $exists: true, $not: { $size: 0 } } })
-      .select('_id name fcmTokens')
+      .find({ fcmToken: { $exists: true, $ne: '' } })
+      .select('_id name fcmToken')
       .lean();
 
     this.logger.log(`Found ${users.length} user(s) with FCM tokens`);
@@ -68,7 +68,7 @@ export class WeeklyReportService {
           },
         });
 
-        if (result.successCount > 0) successUsers++;
+        if (result.success) successUsers++;
         else failedUsers++;
       } catch (err) {
         this.logger.error(

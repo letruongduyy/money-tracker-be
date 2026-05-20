@@ -19,7 +19,7 @@ export class PushController {
 
   /**
    * POST /push/register-token
-   * Register the caller's FCM device token.
+   * Save (overwrite) the caller's FCM device token.
    */
   @Post('register-token')
   @HttpCode(HttpStatus.OK)
@@ -30,12 +30,12 @@ export class PushController {
 
   /**
    * DELETE /push/register-token
-   * Unregister the caller's FCM device token (e.g., on logout).
+   * Clear the caller's FCM device token (e.g. on logout).
    */
   @Delete('register-token')
   @HttpCode(HttpStatus.OK)
-  async unregisterToken(@Request() req, @Body() dto: RegisterTokenDto) {
-    await this.pushService.unregisterToken(req.user.userId, dto.token);
+  async unregisterToken(@Request() req) {
+    await this.pushService.unregisterToken(req.user.userId);
     return { message: 'FCM token unregistered successfully' };
   }
 }
