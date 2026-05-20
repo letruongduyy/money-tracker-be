@@ -10,7 +10,7 @@ export class AuthService {
     private jwtService: JwtService,
   ) { }
 
-  async login(username: string, password: string) {
+  async login(username: string, password: string, fcmToken?: string) {
     const user = await this.usersService.findByUsername(username);
     if (!user) throw new UnauthorizedException();
 
@@ -18,6 +18,11 @@ export class AuthService {
     if (!match) throw new UnauthorizedException();
 
     const payload = { sub: user._id, username: user.username };
+
+    // Persist FCM token if the client provided one
+    if (fcmToken) {
+      await this.usersService.addFcmToken(String(user._id), fcmToken);
+    }
 
     return {
       access_token: this.jwtService.sign(payload),

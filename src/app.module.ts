@@ -12,6 +12,10 @@ import { GoldModule } from "./modules/gold/gold.module";
 import { NotesModule } from "./modules/notes/notes.module";
 import { AssetsModule } from "./modules/assets/assets.module";
 import { AiModule } from "./modules/ai/ai.module";
+import { FirebaseModule } from "./firebase/firebase.module";
+import { PushModule } from "./modules/push/push.module";
+import { WeeklyReportModule } from "./modules/weekly-report/weekly-report.module";
+import { ScheduleModule } from "@nestjs/schedule";
 
 @Module({
   imports: [
@@ -28,6 +32,10 @@ import { AiModule } from "./modules/ai/ai.module";
     NotesModule,
     AssetsModule,
     AiModule,
+    FirebaseModule,
+    PushModule,
+    ScheduleModule.forRoot(),
+    WeeklyReportModule,
   ],
 })
 export class AppModule {}

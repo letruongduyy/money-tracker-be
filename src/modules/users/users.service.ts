@@ -48,6 +48,18 @@ export class UsersService {
     return this.userModel.findByIdAndUpdate(userId, { avatar: avatarUrl }, { returnDocument: 'after' }).select('-password');
   }
 
+  async addFcmToken(userId: string, token: string): Promise<void> {
+    await this.userModel.findByIdAndUpdate(userId, {
+      $addToSet: { fcmTokens: token },
+    });
+  }
+
+  async removeFcmToken(userId: string, token: string): Promise<void> {
+    await this.userModel.findByIdAndUpdate(userId, {
+      $pull: { fcmTokens: token },
+    });
+  }
+
   async getProfile(userId: string) {
     const user = await this.userModel.findById(userId);
     if (!user) throw new NotFoundException('User not found');

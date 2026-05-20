@@ -1,0 +1,23 @@
+# compiled output
+dist/
+node_modules/
+
+# dotenv environment variables file
+.env
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+
+# Firebase service account (contains private keys — never commit)
+src/firebase/firebase-service-account.json
+
+# uploads
+uploads/
+
+# coverage
+coverage/

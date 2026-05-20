@@ -84,4 +84,49 @@ export class TransactionsService {
   async remove(id: string, userId: string) {
     return this.transactionModel.deleteOne({ _id: id, user: userId }).exec();
   }
+
+  async getWeeklyAnalytics(userId: string, from: Date, to: Date) {
+    const mongoose = await import('mongoose');
+    const userObjectId = new mongoose.Types.ObjectId(userId);
+
+    const results = await this.transactionModel.aggregate([
+      {
+        $match: {
+          user: userObjectId,
+          date: { $gte: from, $lte: to },
+        },
+      },
+      {
+        $group: {
+          _id: { type: '$type', category: '$category' },
+          total: { $sum: '$amount' },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    let totalIncome = 0;
+    let totalExpense = 0;
+    let txCount = 0;
+    const expenseByCategory: Record<string, number> = {};
+
+    for (const r of results) {
+      txCount += r.count;
+      if (r._id.type === 'income') {
+        totalIncome += r.total;
+      } else {
+        totalExpense += r.total;
+        expenseByCategory[r._id.category] =
+          (expenseByCategory[r._id.category] ?? 0) + r.total;
+      }
+    }
+
+    return {
+      totalIncome,
+      totalExpense,
+      net: totalIncome - totalExpense,
+      txCount,
+      expenseByCategory,
+    };
+  }
 }

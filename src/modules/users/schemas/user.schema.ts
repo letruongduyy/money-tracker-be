@@ -16,6 +16,9 @@ export class User {
 
   @Prop({ default: '' })
   avatar: string;
+
+  @Prop({ type: [String], default: [] })
+  fcmTokens: string[];
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
