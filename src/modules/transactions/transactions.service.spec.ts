@@ -160,61 +160,56 @@ describe('TransactionsService', () => {
   });
 
   describe('getAnalyticsForPeriod', () => {
-    let getWeeklyAnalyticsSpy: jest.SpyInstance;
+    let mockSort: jest.Mock;
 
     beforeEach(() => {
-      getWeeklyAnalyticsSpy = jest.spyOn(service, 'getWeeklyAnalytics').mockResolvedValue({
-        totalIncome: 1000,
-        totalExpense: 400,
-        net: 600,
-        txCount: 5,
-        expenseByCategory: { food: 400 },
+      mockSort = jest.fn().mockResolvedValue([
+        { _id: '1', amount: 100, type: 'income', date: new Date() },
+      ]);
+      mockTransactionModel.find = jest.fn().mockReturnValue({
+        sort: mockSort,
       });
     });
 
-    afterEach(() => {
-      getWeeklyAnalyticsSpy.mockRestore();
-    });
-
-    it('should calculate correct dates for daily period', async () => {
+    it('should calculate correct dates for daily period and fetch from db', async () => {
       const date = new Date('2026-05-21T15:30:00.000Z');
       const result = await service.getAnalyticsForPeriod('userId', 'daily', date);
 
-      expect(getWeeklyAnalyticsSpy).toHaveBeenCalledWith(
-        'userId',
-        new Date('2026-05-21T00:00:00.000Z'),
-        new Date('2026-05-21T23:59:59.999Z'),
-      );
-      expect(result.startDate.toISOString()).toBe('2026-05-21T00:00:00.000Z');
-      expect(result.endDate.toISOString()).toBe('2026-05-21T23:59:59.999Z');
-      expect(result.totalIncome).toBe(1000);
+      expect(mockTransactionModel.find).toHaveBeenCalledWith({
+        user: 'userId',
+        date: {
+          $gte: new Date('2026-05-21T00:00:00.000Z'),
+          $lte: new Date('2026-05-21T23:59:59.999Z'),
+        },
+      });
+      expect(mockSort).toHaveBeenCalledWith({ date: -1 });
+      expect(result).toHaveLength(1);
     });
 
-    it('should calculate correct dates for weekly period', async () => {
-      // 2026-05-21 is a Thursday, week starts on Monday 2026-05-18
+    it('should calculate correct dates for weekly period and fetch from db', async () => {
       const date = new Date('2026-05-21T10:00:00.000Z');
-      const result = await service.getAnalyticsForPeriod('userId', 'weekly', date);
+      await service.getAnalyticsForPeriod('userId', 'weekly', date);
 
-      expect(getWeeklyAnalyticsSpy).toHaveBeenCalledWith(
-        'userId',
-        new Date('2026-05-18T00:00:00.000Z'),
-        new Date('2026-05-24T23:59:59.999Z'),
-      );
-      expect(result.startDate.toISOString()).toBe('2026-05-18T00:00:00.000Z');
-      expect(result.endDate.toISOString()).toBe('2026-05-24T23:59:59.999Z');
+      expect(mockTransactionModel.find).toHaveBeenCalledWith({
+        user: 'userId',
+        date: {
+          $gte: new Date('2026-05-18T00:00:00.000Z'),
+          $lte: new Date('2026-05-24T23:59:59.999Z'),
+        },
+      });
     });
 
-    it('should calculate correct dates for monthly period', async () => {
+    it('should calculate correct dates for monthly period and fetch from db', async () => {
       const date = new Date('2026-05-21T10:00:00.000Z');
-      const result = await service.getAnalyticsForPeriod('userId', 'monthly', date);
+      await service.getAnalyticsForPeriod('userId', 'monthly', date);
 
-      expect(getWeeklyAnalyticsSpy).toHaveBeenCalledWith(
-        'userId',
-        new Date('2026-05-01T00:00:00.000Z'),
-        new Date('2026-05-31T23:59:59.999Z'),
-      );
-      expect(result.startDate.toISOString()).toBe('2026-05-01T00:00:00.000Z');
-      expect(result.endDate.toISOString()).toBe('2026-05-31T23:59:59.999Z');
+      expect(mockTransactionModel.find).toHaveBeenCalledWith({
+        user: 'userId',
+        date: {
+          $gte: new Date('2026-05-01T00:00:00.000Z'),
+          $lte: new Date('2026-05-31T23:59:59.999Z'),
+        },
+      });
     });
   });
 });

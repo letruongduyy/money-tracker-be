@@ -152,13 +152,10 @@ export class TransactionsService {
       throw new Error('Invalid period');
     }
 
-    const analytics = await this.getWeeklyAnalytics(userId, startDate, endDate);
-
-    return {
-      ...analytics,
-      startDate,
-      endDate,
-    };
+    return this.transactionModel.find({
+      user: userId,
+      date: { $gte: startDate, $lte: endDate },
+    }).sort({ date: -1 });
   }
 
   private getStartOfWeek(date: Date): Date {

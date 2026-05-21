@@ -31,15 +31,15 @@ describe('TransactionsController', () => {
 
   describe('getAnalytics', () => {
     it('should successfully get analytics for a valid period', async () => {
-      const mockResult = {
-        totalIncome: 1000,
-        totalExpense: 400,
-        net: 600,
-        txCount: 4,
-        expenseByCategory: {},
-        startDate: new Date(),
-        endDate: new Date(),
-      };
+      const mockResult = [
+        {
+          _id: 'tx-123',
+          amount: 1000,
+          type: 'income',
+          category: 'salary',
+          date: new Date(),
+        },
+      ];
       mockTransactionsService.getAnalyticsForPeriod.mockResolvedValue(mockResult);
 
       const req = { user: { userId: 'user-123' } };
