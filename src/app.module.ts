@@ -14,7 +14,7 @@ import { AssetsModule } from "./modules/assets/assets.module";
 import { AiModule } from "./modules/ai/ai.module";
 import { FirebaseModule } from "./firebase/firebase.module";
 import { PushModule } from "./modules/push/push.module";
-import { WeeklyReportModule } from "./modules/weekly-report/weekly-report.module";
+import { ReportsModule } from "./modules/reports/reports.module";
 import { ScheduleModule } from "@nestjs/schedule";
 
 @Module({
@@ -35,7 +35,7 @@ import { ScheduleModule } from "@nestjs/schedule";
     FirebaseModule,
     PushModule,
     ScheduleModule.forRoot(),
-    WeeklyReportModule,
+    ReportsModule,
   ],
 })
 export class AppModule {}
