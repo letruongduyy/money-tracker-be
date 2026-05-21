@@ -1,8 +1,8 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { User, UserDocument } from '../users/schemas/user.schema';
-import { FirebaseService, FcmPayload } from '../../firebase/firebase.service';
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { InjectModel } from "@nestjs/mongoose";
+import { Model } from "mongoose";
+import { User, UserDocument } from "../users/schemas/user.schema";
+import { FirebaseService, FcmPayload } from "../../firebase/firebase.service";
 
 @Injectable()
 export class PushService {
@@ -24,7 +24,7 @@ export class PushService {
    * Clear the FCM token for a user (e.g. on logout).
    */
   async unregisterToken(userId: string): Promise<void> {
-    await this.userModel.findByIdAndUpdate(userId, { fcmToken: '' });
+    await this.userModel.findByIdAndUpdate(userId, { fcmToken: "" });
   }
 
   /**
@@ -34,10 +34,10 @@ export class PushService {
     userId: string,
     payload: FcmPayload,
   ): Promise<{ success: boolean }> {
-    const user = await this.userModel.findById(userId).select('fcmToken');
-    if (!user) throw new NotFoundException('User not found');
+    const user = await this.userModel.findById(userId).select("fcmToken");
+    if (!user) throw new NotFoundException("User not found");
 
-    const token: string = user.fcmToken ?? '';
+    const token: string = user.fcmToken ?? "";
     if (!token) {
       this.logger.warn(`User ${userId} has no FCM token registered`);
       return { success: false };
@@ -46,15 +46,17 @@ export class PushService {
     try {
       await this.firebaseService.sendToDevice(token, payload);
       return { success: true };
-    } catch (err) {
-      // Prune the stale token
+    } catch (err: any) {
+      const code = err?.errorInfo?.code;
+
       if (
-        err?.errorInfo?.code === 'messaging/registration-token-not-registered' ||
-        err?.errorInfo?.code === 'messaging/invalid-registration-token'
+        code === "messaging/registration-token-not-registered" ||
+        code === "messaging/invalid-registration-token"
       ) {
-        await this.userModel.findByIdAndUpdate(userId, { fcmToken: '' });
+        await this.userModel.findByIdAndUpdate(userId, { fcmToken: "" });
         this.logger.log(`Pruned stale FCM token for user ${userId}`);
       }
+
       return { success: false };
     }
   }
@@ -66,8 +68,8 @@ export class PushService {
     payload: FcmPayload,
   ): Promise<{ successCount: number; failureCount: number }> {
     const users = await this.userModel
-      .find({ fcmToken: { $exists: true, $ne: '' } })
-      .select('_id fcmToken');
+      .find({ fcmToken: { $exists: true, $ne: "" } })
+      .select("_id fcmToken");
 
     let successCount = 0;
     let failureCount = 0;

@@ -22,6 +22,19 @@ export class TransactionsController {
     return this.transactionsService.update(id, body, req.user.userId);
   }
 
+  @Get('weekly')
+  getWeekly(
+    @Req() req,
+    @Query('month') month?: string,
+    @Query('year') year?: string,
+  ) {
+    return this.transactionsService.getWeeklyTransactions(
+      req.user.userId,
+      month ? parseInt(month) : undefined,
+      year ? parseInt(year) : undefined,
+    );
+  }
+
   @Get()
   findAll(
     @Req() req,

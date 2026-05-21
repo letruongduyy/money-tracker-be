@@ -1,10 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { User, UserDocument } from '../users/schemas/user.schema';
-import { TransactionsService } from '../transactions/transactions.service';
-import { PushService } from '../push/push.service';
+import { Injectable, Logger } from "@nestjs/common";
+import { InjectModel } from "@nestjs/mongoose";
+import { Cron } from "@nestjs/schedule";
+import { Model } from "mongoose";
+import { PushService } from "../push/push.service";
+import { TransactionsService } from "../transactions/transactions.service";
+import { User, UserDocument } from "../users/schemas/user.schema";
 
 @Injectable()
 export class WeeklyReportService {
@@ -20,9 +20,9 @@ export class WeeklyReportService {
    * Runs every Monday at 9:00 AM (server local time).
    * Sends each user a personalised weekly spending summary.
    */
-  @Cron('0 9 * * 1', { name: 'weekly-report' })
+  @Cron("0 9 * * 1", { name: "weekly-report" })
   async sendWeeklyReports() {
-    this.logger.log('⏰ Starting weekly analytics push notifications…');
+    this.logger.log("⏰ Starting weekly analytics push notifications…");
 
     // Date range: last Monday 00:00 → last Sunday 23:59:59
     const now = new Date();
@@ -36,8 +36,8 @@ export class WeeklyReportService {
 
     // Fetch all users that have at least one FCM token
     const users = await this.userModel
-      .find({ fcmToken: { $exists: true, $ne: '' } })
-      .select('_id name fcmToken')
+      .find({ fcmToken: { $exists: true, $ne: "" } })
+      .select("_id name fcmToken")
       .lean();
 
     this.logger.log(`Found ${users.length} user(s) with FCM tokens`);
@@ -60,7 +60,7 @@ export class WeeklyReportService {
           title,
           body,
           data: {
-            type: 'weekly_report',
+            type: "weekly_report",
             totalIncome: String(analytics.totalIncome),
             totalExpense: String(analytics.totalExpense),
             net: String(analytics.net),
@@ -70,9 +70,9 @@ export class WeeklyReportService {
 
         if (result.success) successUsers++;
         else failedUsers++;
-      } catch (err) {
+      } catch (err: any) {
         this.logger.error(
-          `Failed to send weekly report to user ${user._id}: ${err.message}`,
+          `Failed to send weekly report to user ${user._id}: ${err?.message || err}`,
         );
         failedUsers++;
       }
@@ -86,14 +86,16 @@ export class WeeklyReportService {
   // ─── helpers ────────────────────────────────────────────────────────────────
 
   private formatVnd(amount: number): string {
-    return new Intl.NumberFormat('vi-VN').format(Math.round(amount)) + '₫';
+    return new Intl.NumberFormat("vi-VN").format(Math.round(amount)) + "₫";
   }
 
-  private topCategory(expenseByCategory: Record<string, number>): string | null {
+  private topCategory(
+    expenseByCategory: Record<string, number>,
+  ): string | null {
     const entries = Object.entries(expenseByCategory);
     if (!entries.length) return null;
     entries.sort((a, b) => b[1] - a[1]);
-    return entries[0][0].replace(/_/g, ' ');
+    return entries[0][0].replace(/_/g, " ");
   }
 
   private buildMessage(
@@ -122,7 +124,7 @@ export class WeeklyReportService {
         : `overspent by ${this.formatVnd(Math.abs(net))} ⚠️`;
 
     const top = this.topCategory(expenseByCategory);
-    const topLine = top ? ` Top spending: ${top}.` : '';
+    const topLine = top ? ` Top spending: ${top}.` : "";
 
     return {
       title: `📊 Your Weekly Report`,

@@ -129,4 +129,59 @@ export class TransactionsService {
       expenseByCategory,
     };
   }
+
+  private getStartOfWeek(date: Date): Date {
+    const d = new Date(date);
+    const day = d.getUTCDay();
+    const diff = d.getUTCDate() - day + (day === 0 ? -6 : 1);
+    const start = new Date(d.setUTCDate(diff));
+    start.setUTCHours(0, 0, 0, 0);
+    return start;
+  }
+
+  async getWeeklyTransactions(userId: string, month?: number, year?: number) {
+    const transactions = await this.findAll(userId, month, year, 'date', 'desc');
+
+    const weeksMap = new Map<string, {
+      weekStart: string;
+      weekEnd: string;
+      income: number;
+      expense: number;
+      balance: number;
+      transactions: any[];
+    }>();
+
+    for (const tx of transactions) {
+      const txDate = new Date(tx.date);
+      const startOfWeek = this.getStartOfWeek(txDate);
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setUTCDate(startOfWeek.getUTCDate() + 6);
+      endOfWeek.setUTCHours(23, 59, 59, 999);
+
+      const weekKey = startOfWeek.toISOString().split('T')[0];
+
+      if (!weeksMap.has(weekKey)) {
+        weeksMap.set(weekKey, {
+          weekStart: weekKey,
+          weekEnd: endOfWeek.toISOString().split('T')[0],
+          income: 0,
+          expense: 0,
+          balance: 0,
+          transactions: [],
+        });
+      }
+
+      const weekData = weeksMap.get(weekKey)!;
+      weekData.transactions.push(tx);
+
+      if (tx.type === 'income') {
+        weekData.income += tx.amount;
+      } else if (tx.type === 'expense') {
+        weekData.expense += tx.amount;
+      }
+      weekData.balance = weekData.income - weekData.expense;
+    }
+
+    return Array.from(weeksMap.values());
+  }
 }
