@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Req, UseGuards, Query, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Post, Get, Body, Req, UseGuards, Query, Patch, Param, Delete, BadRequestException } from '@nestjs/common';
 import { TransactionsService } from './transactions.service';
 import { AuthGuard } from '@nestjs/passport';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
@@ -20,6 +20,23 @@ export class TransactionsController {
     @Req() req,
   ) {
     return this.transactionsService.update(id, body, req.user.userId);
+  }
+
+  @Get('analytics')
+  getAnalytics(
+    @Req() req,
+    @Query('period') period: 'daily' | 'weekly' | 'monthly',
+    @Query('date') dateString?: string,
+  ) {
+    if (!['daily', 'weekly', 'monthly'].includes(period)) {
+      throw new BadRequestException('Invalid period');
+    }
+    const referenceDate = dateString ? new Date(dateString) : new Date();
+    return this.transactionsService.getAnalyticsForPeriod(
+      req.user.userId,
+      period,
+      referenceDate,
+    );
   }
 
   @Get('weekly')

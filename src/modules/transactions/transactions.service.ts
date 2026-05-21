@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
-import { Model } from "mongoose";
+import { Model, Types } from "mongoose";
 import {
   Transaction,
   TransactionDocument,
@@ -86,8 +86,7 @@ export class TransactionsService {
   }
 
   async getWeeklyAnalytics(userId: string, from: Date, to: Date) {
-    const mongoose = await import('mongoose');
-    const userObjectId = new mongoose.Types.ObjectId(userId);
+    const userObjectId = new Types.ObjectId(userId);
 
     const results = await this.transactionModel.aggregate([
       {
@@ -127,6 +126,38 @@ export class TransactionsService {
       net: totalIncome - totalExpense,
       txCount,
       expenseByCategory,
+    };
+  }
+
+  async getAnalyticsForPeriod(
+    userId: string,
+    period: 'daily' | 'weekly' | 'monthly',
+    date: Date,
+  ) {
+    let startDate: Date;
+    let endDate: Date;
+
+    if (period === 'daily') {
+      startDate = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0, 0));
+      endDate = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 23, 59, 59, 999));
+    } else if (period === 'weekly') {
+      startDate = this.getStartOfWeek(date);
+      endDate = new Date(startDate);
+      endDate.setUTCDate(startDate.getUTCDate() + 6);
+      endDate.setUTCHours(23, 59, 59, 999);
+    } else if (period === 'monthly') {
+      startDate = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1, 0, 0, 0, 0));
+      endDate = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+    } else {
+      throw new Error('Invalid period');
+    }
+
+    const analytics = await this.getWeeklyAnalytics(userId, startDate, endDate);
+
+    return {
+      ...analytics,
+      startDate,
+      endDate,
     };
   }
 
