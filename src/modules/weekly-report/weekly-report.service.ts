@@ -61,6 +61,7 @@ export class WeeklyReportService {
           body,
           data: {
             type: "weekly_report",
+            route: "weekly_analytics",
             totalIncome: String(analytics.totalIncome),
             totalExpense: String(analytics.totalExpense),
             net: String(analytics.net),
