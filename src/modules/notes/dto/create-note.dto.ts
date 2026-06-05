@@ -23,4 +23,16 @@ export class CreateNoteDto {
   @IsString()
   @IsOptional()
   bgImage?: string;
+
+  @IsString()
+  @IsOptional()
+  remindAt?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  isReminderCompleted?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  isReminderSent?: boolean;
 }

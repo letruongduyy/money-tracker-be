@@ -3,12 +3,17 @@ import { InjectModel } from "@nestjs/mongoose";
 import { Model, Types } from "mongoose";
 import { Note, NoteDocument } from "./schemas/note.schema";
 import { CreateNoteDto } from "./dto/create-note.dto";
+import { Cron } from "@nestjs/schedule";
+import { PushService } from "../push/push.service";
 
 @Injectable()
 export class NotesService {
   private readonly logger = new Logger(NotesService.name);
 
-  constructor(@InjectModel(Note.name) private noteModel: Model<NoteDocument>) {}
+  constructor(
+    @InjectModel(Note.name) private noteModel: Model<NoteDocument>,
+    private pushService: PushService,
+  ) {}
 
   async create(createNoteDto: CreateNoteDto, userId: string): Promise<Note> {
     try {
@@ -29,12 +34,17 @@ export class NotesService {
     userId: string,
   ): Promise<Note> {
     try {
+      const updateData: any = { ...updateNoteDto };
+      if (updateData.remindAt !== undefined) {
+        updateData.isReminderSent = false;
+      }
+
       // Only attempt findOneAndUpdate if id looks like a valid ObjectId
       if (Types.ObjectId.isValid(id)) {
         const updatedNote = await this.noteModel
           .findOneAndUpdate(
             { _id: new Types.ObjectId(id), user: new Types.ObjectId(userId) },
-            { $set: updateNoteDto },
+            { $set: updateData },
             { returnDocument: "after" },
           )
           .exec();
@@ -54,13 +64,58 @@ export class NotesService {
 
       // Fallback: create a new note with the provided data
       const createdNote = new this.noteModel({
-        ...updateNoteDto,
+        ...updateData,
         user: new Types.ObjectId(userId),
       });
       return createdNote.save();
     } catch (error) {
       this.logger.error(`Failed to update note ${id}`, error as Error);
       throw error;
+    }
+  }
+
+  @Cron("* * * * *")
+  async checkReminders() {
+    try {
+      const now = new Date();
+      const fifteenMinutesFromNow = new Date(now.getTime() + 15 * 60 * 1000);
+      const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+      const activeReminders = await this.noteModel
+        .find({
+          remindAt: { $gte: oneDayAgo, $lte: fifteenMinutesFromNow },
+          isReminderCompleted: false,
+          isReminderSent: { $ne: true },
+        })
+        .exec();
+
+      if (activeReminders.length === 0) return;
+
+      this.logger.log(`Found ${activeReminders.length} active note reminder(s) to push`);
+
+      for (const note of activeReminders) {
+        try {
+          const userId = String(note.user);
+          const title = note.title || "Lời nhắc ⏰";
+          const body = "Đến giờ rồi! Mày mau đi đi! ⏰";
+
+          await this.pushService.sendToUser(userId, {
+            title,
+            body,
+            data: {
+              type: "note_reminder",
+              noteId: String(note._id),
+            },
+          });
+
+          note.isReminderSent = true;
+          await note.save();
+        } catch (err) {
+          this.logger.error(`Failed to send push for note ${note._id}:`, err);
+        }
+      }
+    } catch (error) {
+      this.logger.error("Error checking note reminders:", error);
     }
   }
 

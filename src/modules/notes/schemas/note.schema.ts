@@ -23,6 +23,15 @@ export class Note {
   @Prop()
   bgImage?: string;
 
+  @Prop()
+  remindAt?: Date;
+
+  @Prop({ default: false })
+  isReminderCompleted: boolean;
+
+  @Prop({ default: false })
+  isReminderSent: boolean;
+
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   user: Types.ObjectId;
 }
