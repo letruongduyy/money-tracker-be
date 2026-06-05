@@ -29,18 +29,35 @@ export class NotesService {
     userId: string,
   ): Promise<Note> {
     try {
-      const updatedNote = await this.noteModel
-        .findOneAndUpdate(
-          { _id: new Types.ObjectId(id), user: new Types.ObjectId(userId) },
-          { $set: updateNoteDto },
-          { returnDocument: "after" },
-        )
-        .exec();
+      // Only attempt findOneAndUpdate if id looks like a valid ObjectId
+      if (Types.ObjectId.isValid(id)) {
+        const updatedNote = await this.noteModel
+          .findOneAndUpdate(
+            { _id: new Types.ObjectId(id), user: new Types.ObjectId(userId) },
+            { $set: updateNoteDto },
+            { returnDocument: "after" },
+          )
+          .exec();
 
-      if (!updatedNote) {
-        throw new NotFoundException("Note not found");
+        if (updatedNote) {
+          return updatedNote;
+        }
+
+        this.logger.warn(
+          `Note ${id} not found for user ${userId} — creating a new one instead`,
+        );
+      } else {
+        this.logger.warn(
+          `Invalid ObjectId "${id}" — creating a new note instead`,
+        );
       }
-      return updatedNote;
+
+      // Fallback: create a new note with the provided data
+      const createdNote = new this.noteModel({
+        ...updateNoteDto,
+        user: new Types.ObjectId(userId),
+      });
+      return createdNote.save();
     } catch (error) {
       this.logger.error(`Failed to update note ${id}`, error as Error);
       throw error;
