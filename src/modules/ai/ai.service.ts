@@ -147,8 +147,8 @@ Ví dụ định dạng mong muốn:
       const parsedData = JSON.parse(textResponse);
 
       // Safely extract fields — AI may return null for any of them
-      const title: string = parsedData.title || "Ghi chú nhanh";
-      const contentText: string = parsedData.content || title;
+      const title = "Nhắc nhở";
+      const contentText: string = parsedData.content || parsedData.title || text;
 
       // Wrap the content in Quill Delta JSON format (use actual \n, not \\n)
       const deltaContent = JSON.stringify([{ insert: contentText + "\n" }]);
@@ -158,7 +158,6 @@ Ví dụ định dạng mong muốn:
         content: deltaContent,
         isList: false,
         isPinned: false,
-        bgImage: "#FFFFFF",
       };
 
       if (parsedData.isReminder && parsedData.remindAt) {

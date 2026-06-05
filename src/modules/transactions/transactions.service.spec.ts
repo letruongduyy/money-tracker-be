@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
 import { TransactionsService } from './transactions.service';
 import { Transaction } from './schemas/transaction.schema';
+import { BudgetsService } from '../budgets/budgets.service';
 
 describe('TransactionsService', () => {
   let service: TransactionsService;
@@ -12,12 +13,20 @@ describe('TransactionsService', () => {
       find: jest.fn(),
     };
 
+    const mockBudgetsService = {
+      checkBudgetAndNotify: jest.fn().mockResolvedValue(null),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TransactionsService,
         {
           provide: getModelToken(Transaction.name),
           useValue: mockTransactionModel,
+        },
+        {
+          provide: BudgetsService,
+          useValue: mockBudgetsService,
         },
       ],
     }).compile();
