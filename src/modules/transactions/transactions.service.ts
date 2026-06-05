@@ -7,27 +7,41 @@ import {
   TransactionCategories,
 } from "./schemas/transaction.schema";
 import { CreateTransactionDto } from "./dto/create-transaction.dto";
+import { BudgetsService } from "../budgets/budgets.service";
 
 @Injectable()
 export class TransactionsService {
   constructor(
     @InjectModel(Transaction.name)
     private transactionModel: Model<TransactionDocument>,
+    private budgetsService: BudgetsService,
   ) {}
 
-  create(data: CreateTransactionDto, userId: string) {
-    return this.transactionModel.create({
+  async create(data: CreateTransactionDto, userId: string) {
+    const tx = await this.transactionModel.create({
       ...data,
       user: userId,
     });
+    if (tx.type === 'expense') {
+      this.budgetsService.checkBudgetAndNotify(userId, tx.category, tx.date).catch(err => {
+        console.error('Failed to check budget and notify:', err);
+      });
+    }
+    return tx;
   }
 
-  update(id: string, data: Partial<CreateTransactionDto>, userId: string) {
-    return this.transactionModel.findOneAndUpdate(
+  async update(id: string, data: Partial<CreateTransactionDto>, userId: string) {
+    const tx = await this.transactionModel.findOneAndUpdate(
       { _id: id, user: userId },
       { $set: data },
       { returnDocument: 'after' },
     );
+    if (tx && tx.type === 'expense') {
+      this.budgetsService.checkBudgetAndNotify(userId, tx.category, tx.date).catch(err => {
+        console.error('Failed to check budget and notify:', err);
+      });
+    }
+    return tx;
   }
 
   findAll(userId: string, month?: number, year?: number, sortBy: string = 'date', order: string = 'desc') {

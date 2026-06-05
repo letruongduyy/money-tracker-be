@@ -19,6 +19,7 @@ import { PushModule } from "./modules/push/push.module";
 import { ReportsModule } from "./modules/reports/reports.module";
 import { ScheduleModule } from "@nestjs/schedule";
 import { RecurringTransactionsModule } from "./modules/recurring-transactions/recurring-transactions.module";
+import { BudgetsModule } from "./modules/budgets/budgets.module";
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { RecurringTransactionsModule } from "./modules/recurring-transactions/re
     ScheduleModule.forRoot(),
     ReportsModule,
     RecurringTransactionsModule,
+    BudgetsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
