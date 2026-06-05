@@ -146,11 +146,15 @@ Ví dụ định dạng mong muốn:
 
       const parsedData = JSON.parse(textResponse);
 
-      // Wrap the content in Quill Delta JSON format
-      const deltaContent = JSON.stringify([{ insert: (parsedData.content || parsedData.title || text) + "\\n" }]);
+      // Safely extract fields — AI may return null for any of them
+      const title: string = parsedData.title || "Ghi chú nhanh";
+      const contentText: string = parsedData.content || title;
+
+      // Wrap the content in Quill Delta JSON format (use actual \n, not \\n)
+      const deltaContent = JSON.stringify([{ insert: contentText + "\n" }]);
 
       const createNoteDto: any = {
-        title: parsedData.title || "Ghi chú nhanh",
+        title,
         content: deltaContent,
         isList: false,
         isPinned: false,
@@ -158,7 +162,7 @@ Ví dụ định dạng mong muốn:
       };
 
       if (parsedData.isReminder && parsedData.remindAt) {
-        createNoteDto.remindAt = parsedData.remindAt;
+        createNoteDto.remindAt = new Date(parsedData.remindAt).toISOString();
         createNoteDto.isReminderCompleted = false;
         createNoteDto.isReminderSent = false;
       }
