@@ -36,4 +36,14 @@ export class ReportsController {
       message: 'Monthly reports triggered successfully',
     };
   }
+
+  @Post('trigger-transaction-reminder')
+  @HttpCode(HttpStatus.OK)
+  async triggerTransactionReminder() {
+    await this.reportsService.sendDailyTransactionReminder();
+    return {
+      success: true,
+      message: 'Daily transaction reminder triggered successfully',
+    };
+  }
 }

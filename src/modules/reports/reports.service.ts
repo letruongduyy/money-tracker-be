@@ -35,6 +35,47 @@ export class ReportsService {
   }
 
   /**
+   * Runs every day at 11:01 PM (server local time).
+   * Reminds all users to log their transactions for today.
+   */
+  @Cron("1 23 * * *", { name: "daily-transaction-reminder" })
+  async sendDailyTransactionReminder() {
+    this.logger.log("⏰ Sending daily transaction reminder notifications…");
+
+    const users = await this.userModel
+      .find({ fcmToken: { $exists: true, $ne: "" } })
+      .select("_id name fcmToken")
+      .lean();
+
+    this.logger.log(`Found ${users.length} user(s) to remind`);
+
+    let success = 0;
+    let failed = 0;
+
+    for (const user of users) {
+      try {
+        const result = await this.pushService.sendToUser(String(user._id), {
+          title: "💰 Đừng quên ghi chép!",
+          body: `Hôm nay bạn đã ghi lại các khoản thu/chi chưa, ${user.name}? Ghi ngay kẻo quên nhé! 📝`,
+          data: { type: "daily_transaction_reminder" },
+        });
+
+        if (result.success) success++;
+        else failed++;
+      } catch (err: any) {
+        this.logger.error(
+          `Failed to send reminder to user ${user._id}: ${err?.message || err}`,
+        );
+        failed++;
+      }
+    }
+
+    this.logger.log(
+      `Daily transaction reminder done — ✅ ${success} succeeded, ❌ ${failed} failed`,
+    );
+  }
+
+  /**
    * Runs every Monday at 9:00 AM (server local time).
    * Sends each user a personalised weekly spending summary.
    */
