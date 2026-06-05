@@ -18,6 +18,7 @@ import { FirebaseModule } from "./firebase/firebase.module";
 import { PushModule } from "./modules/push/push.module";
 import { ReportsModule } from "./modules/reports/reports.module";
 import { ScheduleModule } from "@nestjs/schedule";
+import { RecurringTransactionsModule } from "./modules/recurring-transactions/recurring-transactions.module";
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { ScheduleModule } from "@nestjs/schedule";
     PushModule,
     ScheduleModule.forRoot(),
     ReportsModule,
+    RecurringTransactionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
