@@ -22,11 +22,11 @@ export class FirebaseService implements OnModuleInit {
       return; // already initialized
     }
 
-    const serviceAccountPath =
-      this.configService.get<string>("FIREBASE_SERVICE_ACCOUNT_PATH") ||
-      "../src/firebase/money-tracker-1zzabc-firebase-adminsdk-fbsvc-c7eeb72f23.json";
+    // Option 1: load from JSON file (only if FIREBASE_SERVICE_ACCOUNT_PATH is explicitly set)
+    const serviceAccountPath = this.configService.get<string>(
+      "FIREBASE_SERVICE_ACCOUNT_PATH",
+    );
 
-    // Option 1: load from JSON file
     if (serviceAccountPath) {
       const resolvedPath = path.resolve(process.cwd(), serviceAccountPath);
       this.logger.log(`Firebase service account path: ${resolvedPath}`);
