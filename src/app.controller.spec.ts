@@ -19,4 +19,13 @@ describe('AppController', () => {
       expect(appController.getHello()).toBe('Hello World!');
     });
   });
+
+  describe('health', () => {
+    it('should return status ok and a ISO timestamp', () => {
+      const response = appController.getHealth();
+      expect(response.status).toBe('ok');
+      expect(response.timestamp).toBeDefined();
+      expect(new Date(response.timestamp).getTime()).not.toBeNaN();
+    });
+  });
 });
