@@ -20,6 +20,7 @@ import { ReportsModule } from "./modules/reports/reports.module";
 import { ScheduleModule } from "@nestjs/schedule";
 import { RecurringTransactionsModule } from "./modules/recurring-transactions/recurring-transactions.module";
 import { BudgetsModule } from "./modules/budgets/budgets.module";
+import { CredentialsModule } from "./modules/credentials/credentials.module";
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { BudgetsModule } from "./modules/budgets/budgets.module";
     ReportsModule,
     RecurringTransactionsModule,
     BudgetsModule,
+    CredentialsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
