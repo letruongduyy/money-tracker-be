@@ -51,7 +51,7 @@ export class AppConfigController {
     );
 
     const noteBgImages = [
-      '', // None
+      'https://i.pinimg.com/1200x/45/07/c5/4507c57013d379d050550dcb77e752c1.jpg', // None
       'https://i.pinimg.com/webp85/736x/b8/b1/14/b8b1147c5116733231dfbb9f2bb770f8.webp',
       'https://i.pinimg.com/736x/8c/fc/aa/8cfcaa516f47620347cd99f2ea26668b.jpg',
       'https://i.pinimg.com/webp85/736x/95/6e/b6/956eb606ccd493d4a9efae2b8d13171e.webp',
