@@ -21,6 +21,10 @@ export class CreateCredentialDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsString()
+  category?: string;
 }
 
 export class UpdateCredentialDto {
@@ -43,4 +47,8 @@ export class UpdateCredentialDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsString()
+  category?: string;
 }

@@ -23,6 +23,9 @@ export class Credential {
   @Prop()
   notes?: string;
 
+  @Prop({ default: 'personal' })
+  category: string;
+
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   user: Types.ObjectId;
 }
