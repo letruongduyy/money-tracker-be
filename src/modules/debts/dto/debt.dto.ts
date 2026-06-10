@@ -33,6 +33,19 @@ export class CreateDebtDto {
   @IsOptional()
   @IsBoolean()
   isPaid?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['cash', 'gold', 'currency'])
+  assetType?: string;
+
+  @IsOptional()
+  @IsString()
+  assetSymbol?: string;
+
+  @IsOptional()
+  @IsString()
+  assetUnit?: string;
 }
 
 export class UpdateDebtDto {
@@ -68,4 +81,17 @@ export class UpdateDebtDto {
   @IsOptional()
   @IsBoolean()
   isPaid?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['cash', 'gold', 'currency'])
+  assetType?: string;
+
+  @IsOptional()
+  @IsString()
+  assetSymbol?: string;
+
+  @IsOptional()
+  @IsString()
+  assetUnit?: string;
 }

@@ -32,6 +32,15 @@ export class Debt {
   @Prop({ default: false })
   isPaid: boolean;
 
+  @Prop({ default: 'cash' })
+  assetType: string; // 'cash', 'gold', 'currency'
+
+  @Prop()
+  assetSymbol?: string; // 'USD', 'SJ9999', etc.
+
+  @Prop()
+  assetUnit?: string; // 'tael', 'chi' (for gold)
+
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   user: Types.ObjectId;
 }
