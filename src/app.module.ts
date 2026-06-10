@@ -21,6 +21,7 @@ import { ScheduleModule } from "@nestjs/schedule";
 import { RecurringTransactionsModule } from "./modules/recurring-transactions/recurring-transactions.module";
 import { BudgetsModule } from "./modules/budgets/budgets.module";
 import { CredentialsModule } from "./modules/credentials/credentials.module";
+import { DebtsModule } from "./modules/debts/debts.module";
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { CredentialsModule } from "./modules/credentials/credentials.module";
     RecurringTransactionsModule,
     BudgetsModule,
     CredentialsModule,
+    DebtsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
