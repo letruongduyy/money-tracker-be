@@ -1,4 +1,52 @@
-import { IsString, IsNumber, IsBoolean, IsDateString, IsOptional, IsIn } from 'class-validator';
+import { IsString, IsNumber, IsBoolean, IsDateString, IsOptional, IsIn, IsArray, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class DebtItemDto {
+  @IsString()
+  id: string;
+
+  @IsString()
+  @IsIn(['cash', 'gold', 'currency'])
+  assetType: string;
+
+  @IsNumber()
+  amount: number;
+
+  @IsOptional()
+  @IsString()
+  assetSymbol?: string;
+
+  @IsOptional()
+  @IsString()
+  assetUnit?: string;
+}
+
+export class DebtPaymentDto {
+  @IsString()
+  id: string;
+
+  @IsString()
+  @IsIn(['cash', 'gold', 'currency'])
+  assetType: string;
+
+  @IsNumber()
+  amount: number;
+
+  @IsOptional()
+  @IsString()
+  assetSymbol?: string;
+
+  @IsOptional()
+  @IsString()
+  assetUnit?: string;
+
+  @IsDateString()
+  paymentDate: string;
+
+  @IsOptional()
+  @IsString()
+  note?: string;
+}
 
 export class CreateDebtDto {
   @IsOptional()
@@ -12,12 +60,16 @@ export class CreateDebtDto {
   @IsString()
   personName: string;
 
-  @IsNumber()
-  amount: number;
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => DebtItemDto)
+  items: DebtItemDto[];
 
   @IsOptional()
-  @IsNumber()
-  interestRate?: number;
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => DebtPaymentDto)
+  payments?: DebtPaymentDto[];
 
   @IsDateString()
   startDate: string;
@@ -33,19 +85,6 @@ export class CreateDebtDto {
   @IsOptional()
   @IsBoolean()
   isPaid?: boolean;
-
-  @IsOptional()
-  @IsString()
-  @IsIn(['cash', 'gold', 'currency'])
-  assetType?: string;
-
-  @IsOptional()
-  @IsString()
-  assetSymbol?: string;
-
-  @IsOptional()
-  @IsString()
-  assetUnit?: string;
 }
 
 export class UpdateDebtDto {
@@ -59,12 +98,16 @@ export class UpdateDebtDto {
   personName?: string;
 
   @IsOptional()
-  @IsNumber()
-  amount?: number;
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => DebtItemDto)
+  items?: DebtItemDto[];
 
   @IsOptional()
-  @IsNumber()
-  interestRate?: number;
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => DebtPaymentDto)
+  payments?: DebtPaymentDto[];
 
   @IsOptional()
   @IsDateString()
@@ -81,17 +124,4 @@ export class UpdateDebtDto {
   @IsOptional()
   @IsBoolean()
   isPaid?: boolean;
-
-  @IsOptional()
-  @IsString()
-  @IsIn(['cash', 'gold', 'currency'])
-  assetType?: string;
-
-  @IsOptional()
-  @IsString()
-  assetSymbol?: string;
-
-  @IsOptional()
-  @IsString()
-  assetUnit?: string;
 }

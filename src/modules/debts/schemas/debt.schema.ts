@@ -3,6 +3,52 @@ import mongoose, { Document, Types } from 'mongoose';
 
 export type DebtDocument = Debt & Document;
 
+@Schema()
+export class DebtItem {
+  @Prop({ required: true })
+  id: string;
+
+  @Prop({ required: true })
+  assetType: string; // 'cash', 'gold', 'currency'
+
+  @Prop({ required: true })
+  amount: number;
+
+  @Prop()
+  assetSymbol?: string;
+
+  @Prop()
+  assetUnit?: string;
+}
+
+const DebtItemSchema = SchemaFactory.createForClass(DebtItem);
+
+@Schema()
+export class DebtPayment {
+  @Prop({ required: true })
+  id: string;
+
+  @Prop({ required: true })
+  assetType: string;
+
+  @Prop({ required: true })
+  amount: number;
+
+  @Prop()
+  assetSymbol?: string;
+
+  @Prop()
+  assetUnit?: string;
+
+  @Prop({ required: true })
+  paymentDate: Date;
+
+  @Prop()
+  note?: string;
+}
+
+const DebtPaymentSchema = SchemaFactory.createForClass(DebtPayment);
+
 @Schema({ timestamps: true })
 export class Debt {
   @Prop()
@@ -14,11 +60,11 @@ export class Debt {
   @Prop({ required: true })
   personName: string;
 
-  @Prop({ required: true })
-  amount: number;
+  @Prop({ type: [DebtItemSchema], default: [] })
+  items: DebtItem[];
 
-  @Prop()
-  interestRate?: number;
+  @Prop({ type: [DebtPaymentSchema], default: [] })
+  payments: DebtPayment[];
 
   @Prop({ required: true })
   startDate: Date;
@@ -31,15 +77,6 @@ export class Debt {
 
   @Prop({ default: false })
   isPaid: boolean;
-
-  @Prop({ default: 'cash' })
-  assetType: string; // 'cash', 'gold', 'currency'
-
-  @Prop()
-  assetSymbol?: string; // 'USD', 'SJ9999', etc.
-
-  @Prop()
-  assetUnit?: string; // 'tael', 'chi' (for gold)
 
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   user: Types.ObjectId;
