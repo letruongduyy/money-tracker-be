@@ -22,12 +22,26 @@ import { RecurringTransactionsModule } from "./modules/recurring-transactions/re
 import { BudgetsModule } from "./modules/budgets/budgets.module";
 import { CredentialsModule } from "./modules/credentials/credentials.module";
 import { DebtsModule } from "./modules/debts/debts.module";
+import { BullModule } from "@nestjs/bullmq";
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       envFilePath: ".env",
       isGlobal: true,
+    }),
+    BullModule.forRootAsync({
+      useFactory: () => {
+        const url = process.env.REDIS_URL;
+        return {
+          connection: url
+            ? { url }
+            : {
+                host: process.env.REDIS_HOST || "localhost",
+                port: parseInt(process.env.REDIS_PORT || "6379", 10),
+              },
+        };
+      },
     }),
     DatabaseModule,
     AuthModule,
