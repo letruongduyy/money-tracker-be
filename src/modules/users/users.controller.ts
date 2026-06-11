@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseInterceptors, UploadedFile, BadRequestException, Patch, UseGuards, Req, Get } from "@nestjs/common";
+import { Controller, Post, Body, UseInterceptors, UploadedFile, BadRequestException, Patch, UseGuards, Req, Get, Delete, Param, ForbiddenException } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { diskStorage } from "multer";
@@ -65,5 +65,23 @@ export class UsersController {
   @UseGuards(AuthGuard('jwt'))
   async getProfile(@Req() req) {
     return this.usersService.getProfile(req.user.userId);
+  }
+
+  @Get()
+  @UseGuards(AuthGuard('jwt'))
+  async getAllUsers(@Req() req) {
+    if (req.user.username !== 'admin') {
+      throw new ForbiddenException('Only admin can access this resource');
+    }
+    return this.usersService.findAllWithStats();
+  }
+
+  @Delete(':id')
+  @UseGuards(AuthGuard('jwt'))
+  async deleteUser(@Req() req, @Param('id') id: string) {
+    if (req.user.username !== 'admin') {
+      throw new ForbiddenException('Only admin can access this resource');
+    }
+    return this.usersService.deleteUserCascade(id);
   }
 }

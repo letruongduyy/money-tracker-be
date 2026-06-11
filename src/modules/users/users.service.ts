@@ -1,6 +1,6 @@
 import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { InjectModel, InjectConnection } from '@nestjs/mongoose';
+import { Model, Connection } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { User, UserDocument } from './schemas/user.schema';
@@ -13,6 +13,7 @@ import { GoldService } from '../gold/gold.service';
 export class UsersService {
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectConnection() private connection: Connection,
     private jwtService: JwtService,
     private transactionsService: TransactionsService,
     private assetsService: AssetsService,
@@ -129,5 +130,59 @@ export class UsersService {
       name: user.name,
       netWorth,
     };
+  }
+
+  async findAllWithStats() {
+    const users = await this.userModel.find().select('-password').sort({ createdAt: -1 });
+    const usersWithStats: any[] = [];
+    for (const user of users) {
+      let transactionCount = 0;
+      let assetCount = 0;
+      let noteCount = 0;
+
+      try {
+        transactionCount = await this.connection.model('Transaction').countDocuments({ user: user._id });
+      } catch (e) {}
+
+      try {
+        assetCount = await this.connection.model('Asset').countDocuments({ user: user._id });
+      } catch (e) {}
+
+      try {
+        noteCount = await this.connection.model('Note').countDocuments({ user: user._id });
+      } catch (e) {}
+
+      usersWithStats.push({
+        id: user._id,
+        username: user.username,
+        name: user.name,
+        avatar: user.avatar,
+        createdAt: (user as any).createdAt,
+        stats: {
+          transactions: transactionCount,
+          assets: assetCount,
+          notes: noteCount,
+        }
+      });
+    }
+    return usersWithStats;
+  }
+
+  async deleteUserCascade(userId: string) {
+    const user = await this.userModel.findById(userId);
+    if (!user) throw new NotFoundException('User not found');
+
+    const models = ['Transaction', 'Note', 'Budget', 'Asset', 'RecurringTransaction', 'Credential', 'Debt'];
+    for (const modelName of models) {
+      try {
+        const model = this.connection.model(modelName);
+        await model.deleteMany({ user: userId });
+      } catch (e) {
+        console.error(`Could not delete cascade for model ${modelName}:`, e);
+      }
+    }
+
+    await this.userModel.findByIdAndDelete(userId);
+    return { success: true, message: 'User deleted and all associated data pruned successfully' };
   }
 }
