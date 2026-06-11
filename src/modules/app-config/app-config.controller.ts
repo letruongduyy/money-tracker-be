@@ -1,12 +1,33 @@
-import { Controller, Get } from "@nestjs/common";
+import { Controller, Get, Post, Query, UseGuards, Body, Req } from "@nestjs/common";
+import { AuthGuard } from "@nestjs/passport";
 import {
   TransactionCategories,
   TransactionType,
   PaymentMethod,
 } from "../transactions/schemas/transaction.schema";
+import { AppConfigService } from "./app-config.service";
+import { UpdateVersionDto } from "./dto/update-version.dto";
 
 @Controller("app-config")
 export class AppConfigController {
+  constructor(private appConfigService: AppConfigService) {}
+
+  @Get("update-check")
+  async checkUpdate(
+    @Query("platform") platform: string,
+    @Query("version") version: string,
+    @Query("buildNumber") buildNumber: string,
+  ) {
+    const buildNum = parseInt(buildNumber || "0", 10);
+    return this.appConfigService.checkUpdate(platform, version, buildNum);
+  }
+
+  @Post("update-config")
+  @UseGuards(AuthGuard("jwt"))
+  async updateConfig(@Body() dto: UpdateVersionDto) {
+    return this.appConfigService.updateLatestVersion(dto);
+  }
+
   @Get()
   getConfig() {
     const typeLabels: Record<string, string> = {
