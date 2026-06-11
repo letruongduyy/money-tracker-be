@@ -3,16 +3,31 @@ import { getModelToken } from '@nestjs/mongoose';
 import { ConfigService } from '@nestjs/config';
 import { AppConfigService } from './app-config.service';
 import { AppVersion } from './schemas/app-version.schema';
+import { NoteBackground } from './schemas/note-background.schema';
 
 describe('AppConfigService', () => {
   let service: AppConfigService;
   let mockAppVersionModel: any;
+  let mockNoteBackgroundModel: any;
   let mockConfigService: any;
 
   beforeEach(async () => {
     mockAppVersionModel = {
       findOne: jest.fn(),
       save: jest.fn(),
+    };
+
+    mockNoteBackgroundModel = {
+      countDocuments: jest.fn().mockReturnValue({
+        exec: jest.fn().mockResolvedValue(4),
+      }),
+      find: jest.fn().mockReturnValue({
+        exec: jest.fn().mockResolvedValue([]),
+      }),
+      findOne: jest.fn(),
+      deleteOne: jest.fn().mockReturnValue({
+        exec: jest.fn().mockResolvedValue({ deletedCount: 1 }),
+      }),
     };
 
     mockConfigService = {
@@ -25,6 +40,10 @@ describe('AppConfigService', () => {
         {
           provide: getModelToken(AppVersion.name),
           useValue: mockAppVersionModel,
+        },
+        {
+          provide: getModelToken(NoteBackground.name),
+          useValue: mockNoteBackgroundModel,
         },
         {
           provide: ConfigService,

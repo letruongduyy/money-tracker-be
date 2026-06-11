@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Query, UseGuards, Body, Req } from "@nestjs/common";
+import { Controller, Get, Post, Delete, Query, UseGuards, Body } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import {
   TransactionCategories,
@@ -28,8 +28,22 @@ export class AppConfigController {
     return this.appConfigService.updateLatestVersion(dto);
   }
 
+  @Post("note-backgrounds")
+  @UseGuards(AuthGuard("jwt"))
+  async addBackground(@Body() body: { url: string }) {
+    const url = await this.appConfigService.addNoteBackground(body.url);
+    return { url };
+  }
+
+  @Delete("note-backgrounds")
+  @UseGuards(AuthGuard("jwt"))
+  async deleteBackground(@Body() body: { url: string }) {
+    await this.appConfigService.deleteNoteBackground(body.url);
+    return { success: true };
+  }
+
   @Get()
-  getConfig() {
+  async getConfig() {
     const typeLabels: Record<string, string> = {
       [TransactionType.INCOME]: "Thu nhập",
       [TransactionType.EXPENSE]: "Chi tiêu",
@@ -71,13 +85,7 @@ export class AppConfigController {
       {} as Record<string, any>,
     );
 
-    const noteBgImages = [
-      'https://i.pinimg.com/1200x/45/07/c5/4507c57013d379d050550dcb77e752c1.jpg',
-      'https://i.pinimg.com/1200x/2c/c2/d6/2cc2d6203854347ea995c9ba3e753467.jpg',
-      'https://i.pinimg.com/1200x/ae/80/e6/ae80e67e5ca52c1d27dfde74f04f60a8.jpg',
-      'https://i.pinimg.com/1200x/a2/da/52/a2da5285ecd0650d399a11d59cd8943c.jpg'
-
-    ];
+    const noteBgImages = await this.appConfigService.getNoteBackgrounds();
 
     return {
       transactionTypes: Object.values(TransactionType).map((v) => ({
