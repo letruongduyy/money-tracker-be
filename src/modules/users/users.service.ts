@@ -168,6 +168,19 @@ export class UsersService {
     return usersWithStats;
   }
 
+  async updateSettings(userId: string, settings: { notificationHour?: number }) {
+    const update: any = {};
+    if (settings.notificationHour !== undefined) {
+      if (settings.notificationHour < 0 || settings.notificationHour > 23) {
+        throw new Error('notificationHour must be between 0 and 23');
+      }
+      update.notificationHour = settings.notificationHour;
+    }
+    return this.userModel
+      .findByIdAndUpdate(userId, update, { returnDocument: 'after' })
+      .select('-password');
+  }
+
   async deleteUserCascade(userId: string) {
     const user = await this.userModel.findById(userId);
     if (!user) throw new NotFoundException('User not found');

@@ -84,4 +84,10 @@ export class UsersController {
     }
     return this.usersService.deleteUserCascade(id);
   }
+
+  @Patch('me/settings')
+  @UseGuards(AuthGuard('jwt'))
+  async updateSettings(@Req() req, @Body() body: { notificationHour?: number }) {
+    return this.usersService.updateSettings(req.user.userId, body);
+  }
 }

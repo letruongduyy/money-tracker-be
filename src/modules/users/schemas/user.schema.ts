@@ -19,6 +19,9 @@ export class User {
 
   @Prop({ default: '' })
   fcmToken: string;
+
+  @Prop({ default: 23, min: 0, max: 23 })
+  notificationHour: number; // Vietnam local hour (0–23), default 11 PM
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

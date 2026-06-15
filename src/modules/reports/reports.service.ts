@@ -17,12 +17,13 @@ export class ReportsService {
   ) {}
 
   /**
-   * Runs every day at 11:00 PM Vietnam time (UTC+7) = 16:00 UTC.
-   * Sends each user a personalised daily spending summary of today.
+   * Runs every hour. Sends daily spending summary to users
+   * whose notificationHour matches the current Vietnam local hour.
    */
-  @Cron("0 16 * * *", { name: "daily-report" })
+  @Cron("0 * * * *", { name: "daily-report" })
   async sendDailyReports() {
-    this.logger.log("⏰ Starting daily analytics push notifications…");
+    const vnHour = this.getVietnamHour();
+    this.logger.log(`⏰ Daily report check — Vietnam hour: ${vnHour}`);
 
     const now = new Date();
     const todayStart = new Date(now);
@@ -31,23 +32,28 @@ export class ReportsService {
     const todayEnd = new Date(now);
     todayEnd.setHours(23, 59, 59, 999);
 
-    await this.generateAndSendReports("daily", todayStart, todayEnd);
+    await this.generateAndSendReports("daily", todayStart, todayEnd, vnHour);
   }
 
   /**
-   * Runs every day at 11:01 PM Vietnam time (UTC+7) = 16:01 UTC.
-   * Reminds all users to log their transactions for today.
+   * Runs every hour. Reminds users to log transactions
+   * when current Vietnam hour matches their notificationHour.
    */
-  @Cron("1 16 * * *", { name: "daily-transaction-reminder" })
+  @Cron("1 * * * *", { name: "daily-transaction-reminder" })
   async sendDailyTransactionReminder() {
-    this.logger.log("⏰ Sending daily transaction reminder notifications…");
+    const vnHour = this.getVietnamHour();
+    this.logger.log(`⏰ Transaction reminder check — Vietnam hour: ${vnHour}`);
 
     const users = await this.userModel
-      .find({ fcmToken: { $exists: true, $ne: "" } })
-      .select("_id name fcmToken")
+      .find({
+        fcmToken: { $exists: true, $ne: "" },
+        notificationHour: vnHour,
+      })
+      .select("_id name fcmToken notificationHour")
       .lean();
 
-    this.logger.log(`Found ${users.length} user(s) to remind`);
+    if (users.length === 0) return;
+    this.logger.log(`Found ${users.length} user(s) to remind at hour ${vnHour}`);
 
     let success = 0;
     let failed = 0;
@@ -116,14 +122,21 @@ export class ReportsService {
     period: "daily" | "weekly" | "monthly",
     startDate: Date,
     endDate: Date,
+    notificationHour?: number,
   ) {
-    // Fetch all users that have at least one FCM token
+    // Filter by notificationHour if provided (per-user schedule)
+    const query: any = { fcmToken: { $exists: true, $ne: "" } };
+    if (notificationHour !== undefined) {
+      query.notificationHour = notificationHour;
+    }
+
     const users = await this.userModel
-      .find({ fcmToken: { $exists: true, $ne: "" } })
-      .select("_id name fcmToken")
+      .find(query)
+      .select("_id name fcmToken notificationHour")
       .lean();
 
-    this.logger.log(`Found ${users.length} user(s) with FCM tokens for ${period} report`);
+    if (users.length === 0) return;
+    this.logger.log(`Found ${users.length} user(s) for ${period} report at hour ${notificationHour ?? 'any'}`);
 
     let successUsers = 0;
     let failedUsers = 0;
@@ -167,6 +180,12 @@ export class ReportsService {
   }
 
   // ─── helpers ────────────────────────────────────────────────────────────────
+
+  /** Returns the current hour in Vietnam time (UTC+7), 0–23 */
+  private getVietnamHour(): number {
+    const now = new Date();
+    return (now.getUTCHours() + 7) % 24;
+  }
 
   private formatVnd(amount: number): string {
     return new Intl.NumberFormat("vi-VN").format(Math.round(amount)) + "₫";
