@@ -17,10 +17,10 @@ export class ReportsService {
   ) {}
 
   /**
-   * Runs every day at 11:00 PM (server local time).
+   * Runs every day at 11:00 PM Vietnam time (UTC+7) = 16:00 UTC.
    * Sends each user a personalised daily spending summary of today.
    */
-  @Cron("0 23 * * *", { name: "daily-report" })
+  @Cron("0 16 * * *", { name: "daily-report" })
   async sendDailyReports() {
     this.logger.log("⏰ Starting daily analytics push notifications…");
 
@@ -35,10 +35,10 @@ export class ReportsService {
   }
 
   /**
-   * Runs every day at 11:01 PM (server local time).
+   * Runs every day at 11:01 PM Vietnam time (UTC+7) = 16:01 UTC.
    * Reminds all users to log their transactions for today.
    */
-  @Cron("1 23 * * *", { name: "daily-transaction-reminder" })
+  @Cron("1 16 * * *", { name: "daily-transaction-reminder" })
   async sendDailyTransactionReminder() {
     this.logger.log("⏰ Sending daily transaction reminder notifications…");
 
@@ -76,10 +76,10 @@ export class ReportsService {
   }
 
   /**
-   * Runs every Monday at 9:00 AM (server local time).
+   * Runs every Monday at 9:00 AM Vietnam time (UTC+7) = 02:00 UTC Monday.
    * Sends each user a personalised weekly spending summary.
    */
-  @Cron("0 9 * * 1", { name: "weekly-report" })
+  @Cron("0 2 * * 1", { name: "weekly-report" })
   async sendWeeklyReports() {
     this.logger.log("⏰ Starting weekly analytics push notifications…");
 
@@ -96,10 +96,10 @@ export class ReportsService {
   }
 
   /**
-   * Runs on the first day of every month at 9:00 AM (server local time).
+   * Runs on the first day of every month at 9:00 AM Vietnam time (UTC+7) = 02:00 UTC.
    * Sends each user a personalised monthly spending summary.
    */
-  @Cron("0 9 1 * *", { name: "monthly-report" })
+  @Cron("0 2 1 * *", { name: "monthly-report" })
   async sendMonthlyReports() {
     this.logger.log("⏰ Starting monthly analytics push notifications…");
 

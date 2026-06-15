@@ -186,9 +186,9 @@ export class RecurringTransactionsService {
   }
 
   /**
-   * Run automatically every day at midnight to process due transactions.
+   * Run automatically every day at midnight Vietnam time (UTC+7) = 17:00 UTC.
    */
-  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+  @Cron("0 17 * * *")
   async handleCron() {
     this.logger.log('Starting daily recurring transactions Cron job...');
     try {
