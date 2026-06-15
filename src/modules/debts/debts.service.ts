@@ -1,10 +1,10 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import { Cron } from '@nestjs/schedule';
 import { Debt, DebtDocument } from './schemas/debt.schema';
 import { CreateDebtDto } from './dto/debt.dto';
-import { Queue } from 'bullmq';
-import { InjectQueue } from '@nestjs/bullmq';
+import { PushService } from '../push/push.service';
 
 @Injectable()
 export class DebtsService {
@@ -13,8 +13,7 @@ export class DebtsService {
   constructor(
     @InjectModel(Debt.name)
     private debtModel: Model<DebtDocument>,
-    @InjectQueue('debt-reminder')
-    private readonly debtQueue: Queue,
+    private readonly pushService: PushService,
   ) {}
 
   async create(createDto: CreateDebtDto, userId: string): Promise<Debt> {
@@ -23,9 +22,7 @@ export class DebtsService {
         ...createDto,
         user: new Types.ObjectId(userId),
       });
-      const saved = await created.save();
-      await this.scheduleReminder(saved);
-      return saved;
+      return created.save();
     } catch (error) {
       this.logger.error('Failed to create debt/loan', error as Error);
       throw error;
@@ -49,28 +46,21 @@ export class DebtsService {
           )
           .exec();
 
-        if (updated) {
-          await this.scheduleReminder(updated);
-          return updated;
-        }
+        if (updated) return updated;
 
         this.logger.warn(
           `Debt ${id} not found for user ${userId} — creating a new one instead`,
         );
       } else {
-        this.logger.warn(
-          `Invalid ObjectId "${id}" — creating a new debt instead`,
-        );
+        this.logger.warn(`Invalid ObjectId "${id}" — creating a new debt instead`);
       }
 
-      // Fallback: create a new debt with the provided data
+      // Fallback: create new
       const created = new this.debtModel({
         ...updateData,
         user: new Types.ObjectId(userId),
       });
-      const saved = await created.save();
-      await this.scheduleReminder(saved);
-      return saved;
+      return created.save();
     } catch (error) {
       this.logger.error(`Failed to update debt ${id}`, error as Error);
       throw error;
@@ -84,10 +74,7 @@ export class DebtsService {
         .sort({ updatedAt: -1 })
         .exec();
     } catch (error) {
-      this.logger.error(
-        `Failed to find debts for user ${userId}`,
-        error as Error,
-      );
+      this.logger.error(`Failed to find debts for user ${userId}`, error as Error);
       throw error;
     }
   }
@@ -95,15 +82,9 @@ export class DebtsService {
   async findOne(id: string, userId: string): Promise<Debt> {
     try {
       const debt = await this.debtModel
-        .findOne({
-          _id: new Types.ObjectId(id),
-          user: new Types.ObjectId(userId),
-        })
+        .findOne({ _id: new Types.ObjectId(id), user: new Types.ObjectId(userId) })
         .exec();
-
-      if (!debt) {
-        throw new NotFoundException('Debt not found');
-      }
+      if (!debt) throw new NotFoundException('Debt not found');
       return debt;
     } catch (error) {
       this.logger.error(`Failed to find debt ${id}`, error as Error);
@@ -124,71 +105,80 @@ export class DebtsService {
   async remove(id: string, userId: string): Promise<void> {
     try {
       const result = await this.debtModel
-        .deleteOne({
-          _id: new Types.ObjectId(id),
-          user: new Types.ObjectId(userId),
-        })
+        .deleteOne({ _id: new Types.ObjectId(id), user: new Types.ObjectId(userId) })
         .exec();
-
-      if (result.deletedCount === 0) {
-        throw new NotFoundException('Debt not found');
-      }
-      await this.cancelReminder(id);
+      if (result.deletedCount === 0) throw new NotFoundException('Debt not found');
     } catch (error) {
       this.logger.error(`Failed to remove debt ${id}`, error as Error);
       throw error;
     }
   }
 
-  async scheduleReminder(debt: any): Promise<void> {
+  /**
+   * Runs every day at 8:00 AM Vietnam time (UTC+7) = 01:00 UTC.
+   * Checks debts due today and sends push reminders.
+   */
+  @Cron('0 1 * * *', { name: 'debt-due-reminder' })
+  async checkDebtDueReminders() {
+    this.logger.log('⏰ Checking debt due date reminders…');
     try {
-      // Ensure any existing reminder job for this debt is canceled first
-      await this.cancelReminder(debt._id.toString());
+      // Today in Vietnam time: UTC+7 → today starts at 17:00 UTC yesterday, ends at 17:00 UTC today
+      const now = new Date();
+      const vnNow = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+      const vnYear = vnNow.getUTCFullYear();
+      const vnMonth = vnNow.getUTCMonth();
+      const vnDay = vnNow.getUTCDate();
 
-      if (debt.isPaid || !debt.dueDate) return;
+      // Vietnam midnight (start of today) = UTC 17:00 previous day
+      const todayStartUTC = new Date(Date.UTC(vnYear, vnMonth, vnDay, -7, 0, 0));
+      // Vietnam end of today = UTC 16:59:59 today
+      const todayEndUTC = new Date(Date.UTC(vnYear, vnMonth, vnDay, 17, 0, 0) - 1);
 
-      const dueDate = new Date(debt.dueDate);
-      
-      // Calculate target time: 8:00 AM on the due date in local time (UTC+7 / ICT)
-      // 1. Get due date year, month, day
-      const year = dueDate.getUTCFullYear();
-      const month = dueDate.getUTCMonth();
-      const day = dueDate.getUTCDate();
-      
-      // 2. Create local Date object in UTC+7 (which is 01:00 AM UTC)
-      const targetTime = new Date(Date.UTC(year, month, day, 1, 0, 0)); // 1:00 AM UTC = 8:00 AM UTC+7
+      const dueTodayDebts = await this.debtModel
+        .find({
+          isPaid: false,
+          dueDate: { $gte: todayStartUTC, $lte: todayEndUTC },
+        })
+        .exec();
 
-      const now = Date.now();
-      const delay = Math.max(0, targetTime.getTime() - now);
-
-      this.logger.log(
-        `Scheduling reminder for debt ${debt._id} due on ${dueDate.toISOString()} with delay ${delay}ms (target: ${targetTime.toISOString()})`,
-      );
-
-      await this.debtQueue.add(
-        'send-due-reminder',
-        { debtId: debt._id.toString() },
-        {
-          delay,
-          jobId: debt._id.toString(), // Ensures unique job per debt
-          removeOnComplete: true,
-          removeOnFail: true,
-        },
-      );
-    } catch (error) {
-      this.logger.error(`Failed to schedule reminder for debt ${debt._id}`, error);
-    }
-  }
-
-  async cancelReminder(debtId: string): Promise<void> {
-    try {
-      const job = await this.debtQueue.getJob(debtId);
-      if (job) {
-        this.logger.log(`Canceling existing reminder job for debt ${debtId}`);
-        await job.remove();
+      if (dueTodayDebts.length === 0) {
+        this.logger.log('No debts due today.');
+        return;
       }
+
+      this.logger.log(`Found ${dueTodayDebts.length} debt(s) due today.`);
+
+      let success = 0;
+      let failed = 0;
+
+      for (const debt of dueTodayDebts) {
+        try {
+          const userId = String(debt.user);
+          const isLoan = debt.type === 'loan';
+          const personName = debt.personName || 'ai đó';
+
+          const title = isLoan ? 'Nhắc nhở thu nợ 💸' : 'Nhắc nhở trả nợ ⏰';
+          const body = isLoan
+            ? `Hôm nay đến hạn thu hồi khoản cho vay của ${personName}! Đừng quên liên hệ lấy tiền nhé 💸`
+            : `Hôm nay đến hạn trả nợ cho ${personName}! Bạn nhớ sắp xếp thanh toán nhé ⏰`;
+
+          const result = await this.pushService.sendToUser(userId, {
+            title,
+            body,
+            data: { type: 'debt_reminder', debtId: String(debt._id) },
+          });
+
+          if (result.success) success++;
+          else failed++;
+        } catch (err: any) {
+          this.logger.error(`Failed to send reminder for debt ${debt._id}: ${err?.message}`);
+          failed++;
+        }
+      }
+
+      this.logger.log(`Debt reminders done — ✅ ${success} succeeded, ❌ ${failed} failed`);
     } catch (error) {
-      this.logger.error(`Failed to cancel reminder job for debt ${debtId}`, error);
+      this.logger.error('Error checking debt due reminders', error);
     }
   }
 }
