@@ -5,6 +5,7 @@ import { Cron } from '@nestjs/schedule';
 import { Debt, DebtDocument } from './schemas/debt.schema';
 import { CreateDebtDto } from './dto/debt.dto';
 import { PushService } from '../push/push.service';
+import { User, UserDocument } from '../users/schemas/user.schema';
 
 @Injectable()
 export class DebtsService {
@@ -13,6 +14,8 @@ export class DebtsService {
   constructor(
     @InjectModel(Debt.name)
     private debtModel: Model<DebtDocument>,
+    @InjectModel(User.name)
+    private userModel: Model<UserDocument>,
     private readonly pushService: PushService,
   ) {}
 
@@ -115,25 +118,24 @@ export class DebtsService {
   }
 
   /**
-   * Runs every day at 8:00 AM Vietnam time (UTC+7) = 01:00 UTC.
-   * Checks debts due today and sends push reminders.
+   * Runs every hour. Sends debt due reminders to users
+   * whose notificationHour matches the current Vietnam local hour.
    */
-  @Cron('0 1 * * *', { name: 'debt-due-reminder' })
+  @Cron('0 * * * *', { name: 'debt-due-reminder' })
   async checkDebtDueReminders() {
-    this.logger.log('⏰ Checking debt due date reminders…');
+    const vnHour = (new Date().getUTCHours() + 7) % 24;
+    this.logger.log(`⏰ Debt due reminder check — Vietnam hour: ${vnHour}`);
     try {
-      // Today in Vietnam time: UTC+7 → today starts at 17:00 UTC yesterday, ends at 17:00 UTC today
+      // Today range in UTC (accounting for UTC+7)
       const now = new Date();
       const vnNow = new Date(now.getTime() + 7 * 60 * 60 * 1000);
       const vnYear = vnNow.getUTCFullYear();
       const vnMonth = vnNow.getUTCMonth();
       const vnDay = vnNow.getUTCDate();
-
-      // Vietnam midnight (start of today) = UTC 17:00 previous day
       const todayStartUTC = new Date(Date.UTC(vnYear, vnMonth, vnDay, -7, 0, 0));
-      // Vietnam end of today = UTC 16:59:59 today
       const todayEndUTC = new Date(Date.UTC(vnYear, vnMonth, vnDay, 17, 0, 0) - 1);
 
+      // Find debts due today
       const dueTodayDebts = await this.debtModel
         .find({
           isPaid: false,
@@ -141,11 +143,7 @@ export class DebtsService {
         })
         .exec();
 
-      if (dueTodayDebts.length === 0) {
-        this.logger.log('No debts due today.');
-        return;
-      }
-
+      if (dueTodayDebts.length === 0) return;
       this.logger.log(`Found ${dueTodayDebts.length} debt(s) due today.`);
 
       let success = 0;
@@ -154,9 +152,17 @@ export class DebtsService {
       for (const debt of dueTodayDebts) {
         try {
           const userId = String(debt.user);
+
+          // Check if this user's notificationHour matches current VN hour
+          const user = await this.userModel
+            .findById(userId)
+            .select('notificationHour')
+            .lean();
+          const userHour = user?.notificationHour ?? 23;
+          if (userHour !== vnHour) continue;
+
           const isLoan = debt.type === 'loan';
           const personName = debt.personName || 'ai đó';
-
           const title = isLoan ? 'Nhắc nhở thu nợ 💸' : 'Nhắc nhở trả nợ ⏰';
           const body = isLoan
             ? `Hôm nay đến hạn thu hồi khoản cho vay của ${personName}! Đừng quên liên hệ lấy tiền nhé 💸`
