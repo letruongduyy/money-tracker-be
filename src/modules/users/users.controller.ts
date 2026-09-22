@@ -67,6 +67,12 @@ export class UsersController {
     return this.usersService.getProfile(req.user.userId);
   }
 
+  @Get("total-balance")
+  @UseGuards(AuthGuard('jwt'))
+  async getTotalBalance(@Req() req) {
+    return this.usersService.getTotalBalance(req.user.userId);
+  }
+
   @Get()
   @UseGuards(AuthGuard('jwt'))
   async getAllUsers(@Req() req) {

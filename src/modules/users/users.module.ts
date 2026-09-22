@@ -7,6 +7,7 @@ import { User, UserSchema } from './schemas/user.schema';
 import { TransactionsModule } from '../transactions/transactions.module';
 import { AssetsModule } from '../assets/assets.module';
 import { GoldModule } from '../gold/gold.module';
+import { DebtsModule } from '../debts/debts.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { GoldModule } from '../gold/gold.module';
     TransactionsModule,
     AssetsModule,
     GoldModule,
+    DebtsModule,
   ],
   providers: [UsersService],
   controllers: [UsersController],

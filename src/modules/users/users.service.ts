@@ -8,6 +8,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { TransactionsService } from '../transactions/transactions.service';
 import { AssetsService } from '../assets/assets.service';
 import { GoldService } from '../gold/gold.service';
+import { DebtsService } from '../debts/debts.service';
 
 @Injectable()
 export class UsersService {
@@ -18,6 +19,7 @@ export class UsersService {
     private transactionsService: TransactionsService,
     private assetsService: AssetsService,
     private goldService: GoldService,
+    private debtsService: DebtsService,
   ) { }
 
   async create(createUserDto: CreateUserDto) {
@@ -129,6 +131,176 @@ export class UsersService {
     return {
       name: user.name,
       netWorth,
+    };
+  }
+
+  async getTotalBalance(userId: string) {
+    const user = await this.userModel.findById(userId);
+    if (!user) throw new NotFoundException('User not found');
+
+    const { income, expense, balance } = await this.transactionsService.getBalance(userId);
+    const assets = await this.assetsService.findAll(userId);
+    const debts = await this.debtsService.findAll(userId);
+
+    let goldPrices: any = {};
+    let currencyRates: any[] = [];
+
+    try {
+      const goldData = await this.goldService.getGoldPrices('SJ9999', 1);
+      if (goldData && goldData.length > 0) {
+        goldPrices = goldData[0].prices || {};
+      }
+    } catch (e) {
+      console.log('Error fetching gold prices', e);
+    }
+
+    try {
+      const currencyData = await this.goldService.getCurrencyRates();
+      if (currencyData && currencyData.rates) {
+        currencyRates = currencyData.rates;
+      }
+    } catch (e) {
+      console.log('Error fetching currency rates', e);
+    }
+
+    let cashTotal = 0;
+    let goldTotal = 0;
+    let currencyTotal = 0;
+
+    for (const asset of assets) {
+      if (asset.type === 'cash') {
+        cashTotal += asset.amount;
+      } else if (asset.type === 'gold') {
+        const rawSymbol = asset.symbol || 'SJ9999';
+        const symbol = rawSymbol.split(':')[0];
+        let buyPrice = 160000000.0;
+        const priceEntry = goldPrices[symbol] || (Object.values(goldPrices)[0] as any);
+        if (priceEntry) {
+          buyPrice = parseFloat(priceEntry.buy?.toString().replace(/,/g, '')) || buyPrice;
+        }
+
+        const isChi = (asset as any).unit === 'chi' || rawSymbol.split(':')[1] === 'chi';
+        const finalAmount = isChi ? asset.amount / 10 : asset.amount;
+        goldTotal += finalAmount * buyPrice;
+      } else if (asset.type === 'currency') {
+        const symbol = asset.symbol || 'USD';
+        let rate = 0.0;
+        const rateEntry = currencyRates.find((r: any) => r.currencyCode === symbol);
+        if (rateEntry) {
+          rate = parseFloat(rateEntry.sell?.toString().replace(/,/g, '')) || 0.0;
+        }
+        if (rate === 0.0) {
+          const defaultRates: Record<string, number> = {
+            'USD': 26000.0,
+            'EUR': 30000.0,
+            'JPY': 170.0,
+            'GBP': 35000.0,
+            'AUD': 19000.0,
+            'CAD': 19000.0,
+            'SGD': 20000.0,
+            'CNY': 3900.0,
+          };
+          rate = defaultRates[symbol] || 1.0;
+        }
+        currencyTotal += asset.amount * rate;
+      }
+    }
+
+    const totalAssetsValuation = cashTotal + goldTotal + currencyTotal;
+    const totalBalance = balance + totalAssetsValuation;
+
+    // Calculate unpaid debts
+    let totalLoan = 0;
+    let totalDebt = 0;
+
+    const calculateItemValuation = (item: any) => {
+      if (!item) return 0;
+      if (item.assetType === 'cash') {
+        return item.amount || 0;
+      } else if (item.assetType === 'gold') {
+        const rawSymbol = item.assetSymbol || 'SJ9999';
+        const symbol = rawSymbol.split(':')[0];
+        let buyPrice = 160000000.0;
+        const priceEntry = goldPrices[symbol] || (Object.values(goldPrices)[0] as any);
+        if (priceEntry) {
+          buyPrice = parseFloat(priceEntry.buy?.toString().replace(/,/g, '')) || buyPrice;
+        }
+        const isChi = item.assetUnit === 'chi' || rawSymbol.split(':')[1] === 'chi';
+        const finalAmount = isChi ? (item.amount || 0) / 10 : (item.amount || 0);
+        return finalAmount * buyPrice;
+      } else if (item.assetType === 'currency') {
+        const symbol = item.assetSymbol || 'USD';
+        let rate = 0.0;
+        const rateEntry = currencyRates.find((r: any) => r.currencyCode === symbol);
+        if (rateEntry) {
+          rate = parseFloat(rateEntry.sell?.toString().replace(/,/g, '')) || 0.0;
+        }
+        if (rate === 0.0) {
+          const defaultRates: Record<string, number> = {
+            'USD': 26000.0,
+            'EUR': 30000.0,
+            'JPY': 170.0,
+            'GBP': 35000.0,
+            'AUD': 19000.0,
+            'CAD': 19000.0,
+            'SGD': 20000.0,
+            'CNY': 3900.0,
+          };
+          rate = defaultRates[symbol] || 1.0;
+        }
+        return (item.amount || 0) * rate;
+      }
+      return 0;
+    };
+
+    for (const d of debts) {
+      if (!d.isPaid) {
+        let itemsTotal = 0;
+        if (d.items && Array.isArray(d.items)) {
+          for (const it of d.items) {
+            itemsTotal += calculateItemValuation(it);
+          }
+        }
+        let paymentsTotal = 0;
+        if (d.payments && Array.isArray(d.payments)) {
+          for (const p of d.payments) {
+            paymentsTotal += calculateItemValuation(p);
+          }
+        }
+        const remainingValuation = Math.max(0, itemsTotal - paymentsTotal);
+        if (d.type === 'debt') {
+          totalDebt += remainingValuation;
+        } else {
+          totalLoan += remainingValuation;
+        }
+      }
+    }
+
+    const netWorthWithDebts = totalBalance + totalLoan - totalDebt;
+
+    return {
+      status: true,
+      data: {
+        totalBalance,
+        netWorthWithDebts,
+        transactions: {
+          income,
+          expense,
+          balance,
+        },
+        assets: {
+          totalValuation: totalAssetsValuation,
+          breakdown: {
+            cash: cashTotal,
+            gold: goldTotal,
+            currency: currencyTotal,
+          },
+        },
+        debts: {
+          totalLoan,
+          totalDebt,
+        },
+      },
     };
   }
 
