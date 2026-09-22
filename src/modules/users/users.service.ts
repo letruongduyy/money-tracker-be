@@ -63,81 +63,6 @@ export class UsersService {
     const user = await this.userModel.findById(userId);
     if (!user) throw new NotFoundException('User not found');
 
-    const { balance } = await this.transactionsService.getBalance(userId);
-    const assets = await this.assetsService.findAll(userId);
-
-    let goldPrices: any = {};
-    let currencyRates: any[] = [];
-
-    try {
-      const goldData = await this.goldService.getGoldPrices('SJ9999', 1);
-      if (goldData && goldData.length > 0) {
-        goldPrices = goldData[0].prices || {};
-      }
-    } catch (e) {
-      console.log('Error fetching gold prices', e);
-    }
-
-    try {
-      const currencyData = await this.goldService.getCurrencyRates();
-      if (currencyData && currencyData.rates) {
-        currencyRates = currencyData.rates;
-      }
-    } catch (e) {
-      console.log('Error fetching currency rates', e);
-    }
-
-    let netWorth = balance;
-
-    for (const asset of assets) {
-      if (asset.type === 'cash') {
-        netWorth += asset.amount;
-      } else if (asset.type === 'gold') {
-        const rawSymbol = asset.symbol || 'SJ9999';
-        const symbol = rawSymbol.split(':')[0];
-        let buyPrice = 160000000.0;
-        const priceEntry = goldPrices[symbol] || (Object.values(goldPrices)[0] as any);
-        if (priceEntry) {
-          buyPrice = parseFloat(priceEntry.buy?.toString().replace(/,/g, '')) || buyPrice;
-        }
-        
-        const isChi = (asset as any).unit === 'chi' || rawSymbol.split(':')[1] === 'chi';
-        const finalAmount = isChi ? asset.amount / 10 : asset.amount;
-        netWorth += finalAmount * buyPrice;
-      } else if (asset.type === 'currency') {
-        const symbol = asset.symbol || 'USD';
-        let rate = 0.0;
-        const rateEntry = currencyRates.find((r: any) => r.currencyCode === symbol);
-        if (rateEntry) {
-          rate = parseFloat(rateEntry.sell?.toString().replace(/,/g, '')) || 0.0;
-        }
-        if (rate === 0.0) {
-          const defaultRates: Record<string, number> = {
-            'USD': 26000.0,
-            'EUR': 30000.0,
-            'JPY': 170.0,
-            'GBP': 35000.0,
-            'AUD': 19000.0,
-            'CAD': 19000.0,
-            'SGD': 20000.0,
-            'CNY': 3900.0,
-          };
-          rate = defaultRates[symbol] || 1.0;
-        }
-        netWorth += asset.amount * rate;
-      }
-    }
-
-    return {
-      name: user.name,
-      netWorth,
-    };
-  }
-
-  async getTotalBalance(userId: string) {
-    const user = await this.userModel.findById(userId);
-    if (!user) throw new NotFoundException('User not found');
-
     const { income, expense, balance } = await this.transactionsService.getBalance(userId);
     const assets = await this.assetsService.findAll(userId);
     const debts = await this.debtsService.findAll(userId);
@@ -279,27 +204,28 @@ export class UsersService {
     const netWorthWithDebts = totalBalance + totalLoan - totalDebt;
 
     return {
-      status: true,
-      data: {
-        totalBalance,
-        netWorthWithDebts,
-        transactions: {
-          income,
-          expense,
-          balance,
+      name: user.name,
+      avatar: user.avatar,
+      username: user.username,
+      netWorth: totalBalance,
+      totalBalance,
+      netWorthWithDebts,
+      transactions: {
+        income,
+        expense,
+        balance,
+      },
+      assets: {
+        totalValuation: totalAssetsValuation,
+        breakdown: {
+          cash: cashTotal,
+          gold: goldTotal,
+          currency: currencyTotal,
         },
-        assets: {
-          totalValuation: totalAssetsValuation,
-          breakdown: {
-            cash: cashTotal,
-            gold: goldTotal,
-            currency: currencyTotal,
-          },
-        },
-        debts: {
-          totalLoan,
-          totalDebt,
-        },
+      },
+      debts: {
+        totalLoan,
+        totalDebt,
       },
     };
   }
