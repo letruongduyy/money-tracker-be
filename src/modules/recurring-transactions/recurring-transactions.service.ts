@@ -122,7 +122,7 @@ export class RecurringTransactionsService {
   }
 
   async findAll(userId: string) {
-    return this.recurringModel.find({ user: userId }).sort({ createdAt: -1 });
+    return this.recurringModel.find({ user: new Types.ObjectId(userId) }).sort({ createdAt: -1 });
   }
 
   async remove(id: string, userId: string) {
