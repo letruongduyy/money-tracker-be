@@ -100,7 +100,10 @@ export class RecurringTransactionsService {
 
     // If frequency or startDate changes, recalculate nextExecutionDate if not provided explicitly
     if ((data.frequency || data.startDate) && !data.nextExecutionDate) {
-      const existing = await this.recurringModel.findOne({ _id: id, user: userId });
+      const existing = await this.recurringModel.findOne({
+        _id: new Types.ObjectId(id),
+        user: new Types.ObjectId(userId),
+      });
       if (existing) {
         const finalStartDate = data.startDate ? new Date(data.startDate) : existing.startDate;
         const finalFrequency = data.frequency || existing.frequency;
@@ -115,7 +118,7 @@ export class RecurringTransactionsService {
     }
 
     return this.recurringModel.findOneAndUpdate(
-      { _id: id, user: userId },
+      { _id: new Types.ObjectId(id), user: new Types.ObjectId(userId) },
       { $set: updatePayload },
       { returnDocument: 'after' },
     );
@@ -126,7 +129,10 @@ export class RecurringTransactionsService {
   }
 
   async remove(id: string, userId: string) {
-    return this.recurringModel.deleteOne({ _id: id, user: userId }).exec();
+    return this.recurringModel.deleteOne({
+      _id: new Types.ObjectId(id),
+      user: new Types.ObjectId(userId),
+    }).exec();
   }
 
   /**
