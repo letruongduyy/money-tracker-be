@@ -22,6 +22,7 @@ import { RecurringTransactionsModule } from "./modules/recurring-transactions/re
 import { BudgetsModule } from "./modules/budgets/budgets.module";
 import { CredentialsModule } from "./modules/credentials/credentials.module";
 import { DebtsModule } from "./modules/debts/debts.module";
+import { SalariesModule } from "./modules/salaries/salaries.module";
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { DebtsModule } from "./modules/debts/debts.module";
     BudgetsModule,
     CredentialsModule,
     DebtsModule,
+    SalariesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
