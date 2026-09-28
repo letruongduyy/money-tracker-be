@@ -118,6 +118,11 @@ export class AssetsService {
           { returnDocument: 'after' }
         );
       }
+      // Sync is idempotent by localId; semantic merging here would collapse split parts.
+      return this.assetModel.create({
+        ...data,
+        user: userId,
+      });
     }
     return this.mergeOrCreate(data, userId);
   }
