@@ -1,4 +1,4 @@
-import { IsNumber, IsEnum, IsString, IsOptional } from 'class-validator';
+import { IsNumber, IsEnum, IsString, IsOptional, IsDateString } from 'class-validator';
 import { AssetType } from '../schemas/asset.schema';
 
 export class CreateAssetDto {
@@ -6,7 +6,7 @@ export class CreateAssetDto {
   @IsString()
   localId?: string;
 
-  @IsEnum(AssetType, { message: 'Type must be cash, gold, or currency' })
+  @IsEnum(AssetType, { message: 'Type must be cash, gold, currency, or savings' })
   type: AssetType;
 
   @IsString()
@@ -22,6 +22,18 @@ export class CreateAssetDto {
   @IsOptional()
   @IsString()
   unit?: string;
+
+  @IsOptional()
+  @IsDateString()
+  startDate?: Date;
+
+  @IsOptional()
+  @IsNumber()
+  termMonths?: number;
+
+  @IsOptional()
+  @IsNumber()
+  interestRate?: number;
 }
 
 export class UpdateAssetDto {
@@ -44,4 +56,16 @@ export class UpdateAssetDto {
   @IsOptional()
   @IsString()
   unit?: string;
+
+  @IsOptional()
+  @IsDateString()
+  startDate?: Date;
+
+  @IsOptional()
+  @IsNumber()
+  termMonths?: number;
+
+  @IsOptional()
+  @IsNumber()
+  interestRate?: number;
 }

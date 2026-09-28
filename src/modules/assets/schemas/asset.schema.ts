@@ -7,6 +7,7 @@ export enum AssetType {
   CASH = 'cash',
   GOLD = 'gold',
   CURRENCY = 'currency',
+  SAVINGS = 'savings',
 }
 
 @Schema({ timestamps: true })
@@ -28,6 +29,15 @@ export class Asset {
 
   @Prop()
   unit?: string; // 'tael', 'chi'
+
+  @Prop()
+  startDate?: Date;
+
+  @Prop()
+  termMonths?: number;
+
+  @Prop()
+  interestRate?: number;
 
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   user: Types.ObjectId;
