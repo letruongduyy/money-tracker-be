@@ -1,23 +1,83 @@
-import { Injectable, InternalServerErrorException } from "@nestjs/common";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { Injectable, InternalServerErrorException, Logger } from "@nestjs/common";
 import { TransactionsService } from "../transactions/transactions.service";
 import { NotesService } from "../notes/notes.service";
 
 @Injectable()
 export class AiService {
-  private genAI: GoogleGenerativeAI;
-  private model: any;
+  private readonly logger = new Logger(AiService.name);
 
   constructor(
     private readonly transactionsService: TransactionsService,
     private readonly notesService: NotesService,
   ) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      console.warn("GEMINI_API_KEY is not set in the environment variables");
+    const groqKey = process.env.GROQ_API_KEY;
+    if (!groqKey) {
+      this.logger.warn("GROQ_API_KEY is not set in the environment variables");
     }
-    this.genAI = new GoogleGenerativeAI(apiKey ?? "");
-    this.model = this.genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+  }
+
+  /**
+   * AI JSON generator powered by Groq Cloud (Ultra-fast ~0.3s, LPU hardware)
+   */
+  private async generateJson(prompt: string): Promise<any> {
+    const groqApiKey = process.env.GROQ_API_KEY;
+    if (!groqApiKey) {
+      throw new InternalServerErrorException("GROQ_API_KEY is not configured");
+    }
+
+    const groqModel = process.env.GROQ_MODEL || "qwen/qwen3.8-27b";
+    const startTime = Date.now();
+
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${groqApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: groqModel,
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are an expert AI assistant that strictly responds in valid JSON. Do not include markdown code blocks (```json) or any explanatory text outside the JSON object.",
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.1,
+      }),
+      signal: AbortSignal.timeout(8000),
+    });
+
+    if (!response.ok) {
+      const errBody = await response.text();
+      this.logger.error(`[Groq AI] Request failed (${response.status}): ${errBody}`);
+      throw new InternalServerErrorException(`Groq AI request failed with status ${response.status}`);
+    }
+
+    const data: any = await response.json();
+    const content = data.choices?.[0]?.message?.content?.trim();
+    if (!content) {
+      throw new InternalServerErrorException("Groq AI returned an empty response");
+    }
+
+    const latency = Date.now() - startTime;
+    this.logger.log(`[Groq AI] Processed successfully in ${latency}ms using model: ${groqModel}`);
+    return JSON.parse(this.cleanJsonString(content));
+  }
+
+  private cleanJsonString(text: string): string {
+    let cleaned = text.trim();
+    if (cleaned.startsWith("```json")) {
+      cleaned = cleaned.replace("```json", "").replace("```", "").trim();
+    } else if (cleaned.startsWith("```")) {
+      cleaned = cleaned.replace("```", "").trim();
+    }
+    return cleaned;
   }
 
   async parseTransactionFromNote(text: string, userId: string) {
@@ -61,20 +121,7 @@ Ví dụ định dạng mong muốn:
 }
 `;
 
-      const result = await this.model.generateContent(prompt);
-      const response = await result.response;
-      let textResponse = response.text().trim();
-
-      if (textResponse.startsWith("\`\`\`json")) {
-        textResponse = textResponse
-          .replace("\`\`\`json", "")
-          .replace("\`\`\`", "")
-          .trim();
-      } else if (textResponse.startsWith("\`\`\`")) {
-        textResponse = textResponse.replace("\`\`\`", "").trim();
-      }
-
-      const parsedData = JSON.parse(textResponse);
+      const parsedData = await this.generateJson(prompt);
 
       // Safety mappings in case AI hallucinated slightly
       if (parsedData.categoryId && !parsedData.category) {
@@ -131,20 +178,7 @@ Ví dụ định dạng mong muốn:
 }
 `;
 
-      const result = await this.model.generateContent(prompt);
-      const response = await result.response;
-      let textResponse = response.text().trim();
-
-      if (textResponse.startsWith("\`\`\`json")) {
-        textResponse = textResponse
-          .replace("\`\`\`json", "")
-          .replace("\`\`\`", "")
-          .trim();
-      } else if (textResponse.startsWith("\`\`\`")) {
-        textResponse = textResponse.replace("\`\`\`", "").trim();
-      }
-
-      const parsedData = JSON.parse(textResponse);
+      const parsedData = await this.generateJson(prompt);
 
       // Safely extract fields — AI may return null for any of them
       const title = "Nhắc nhở";
@@ -177,3 +211,4 @@ Ví dụ định dạng mong muốn:
     }
   }
 }
+
