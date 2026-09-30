@@ -87,7 +87,7 @@ export class UsersController {
 
   @Patch('me/settings')
   @UseGuards(AuthGuard('jwt'))
-  async updateSettings(@Req() req, @Body() body: { notificationHour?: number }) {
+  async updateSettings(@Req() req, @Body() body: { notificationHour?: number; notificationMinute?: number }) {
     return this.usersService.updateSettings(req.user.userId, body);
   }
 }

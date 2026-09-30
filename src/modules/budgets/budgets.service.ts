@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Budget, BudgetDocument } from './schemas/budget.schema';
 import { CreateBudgetDto } from './dto/create-budget.dto';
 import { Transaction, TransactionDocument } from '../transactions/schemas/transaction.schema';
@@ -32,17 +32,18 @@ export class BudgetsService {
 
   async upsertBudget(dto: CreateBudgetDto, userId: string): Promise<BudgetDocument> {
     const { category, amount, month, year, localId, id } = dto;
+    const userObjectId = new Types.ObjectId(userId);
 
     // Check if budget already exists
     let budget = await this.budgetModel.findOne({
-      user: userId,
+      user: userObjectId,
       category,
       month,
       year,
     });
 
     if (budget) {
-      // If budget exists, update it. If the amount increased, we can optionally reset notification flags if spending is now below thresholds.
+      // If budget exists, update it.
       const currentSpending = await this.calculateCategorySpending(userId, category, month, year);
       const notified80 = currentSpending >= amount * 0.8 ? budget.notified80 : false;
       const notified100 = currentSpending >= amount ? budget.notified100 : false;
@@ -50,19 +51,35 @@ export class BudgetsService {
       budget.amount = amount;
       budget.notified80 = notified80;
       budget.notified100 = notified100;
-      if (localId) budget.localId = localId;
+      if (localId) {
+        budget.localId = localId;
+      } else if (id && !Types.ObjectId.isValid(id) && !budget.localId) {
+        budget.localId = id;
+      }
       await budget.save();
     } else {
-      // Create new budget
-      budget = await this.budgetModel.create({
-        user: userId,
+      // Create new budget - let MongoDB auto-generate _id
+      const createData: any = {
+        user: userObjectId,
         category,
         amount,
         month,
         year,
-        localId,
-        _id: id,
-      });
+      };
+
+      if (localId) {
+        createData.localId = localId;
+      } else if (id && !Types.ObjectId.isValid(id)) {
+        // If client passed a UUID as id, save it to localId
+        createData.localId = id;
+      }
+
+      // Backward compatibility: only set _id if id was passed and is a valid 24-char ObjectId
+      if (id && Types.ObjectId.isValid(id)) {
+        createData._id = new Types.ObjectId(id);
+      }
+
+      budget = await this.budgetModel.create(createData);
     }
 
     return budget;
@@ -82,14 +99,21 @@ export class BudgetsService {
   }
 
   async findAll(userId: string, month?: number, year?: number): Promise<BudgetDocument[]> {
-    const filter: any = { user: userId };
+    const filter: any = { user: new Types.ObjectId(userId) };
     if (month !== undefined) filter.month = month;
     if (year !== undefined) filter.year = year;
     return this.budgetModel.find(filter).sort({ category: 1 });
   }
 
   async remove(id: string, userId: string): Promise<any> {
-    return this.budgetModel.deleteOne({ _id: id, user: userId }).exec();
+    const userObjectId = new Types.ObjectId(userId);
+    const filter: any = { user: userObjectId };
+    if (Types.ObjectId.isValid(id)) {
+      filter._id = new Types.ObjectId(id);
+    } else {
+      filter.localId = id;
+    }
+    return this.budgetModel.deleteOne(filter).exec();
   }
 
   async checkBudgetAndNotify(userId: string, category: string, date: Date): Promise<void> {
@@ -97,7 +121,7 @@ export class BudgetsService {
     const year = date.getUTCFullYear();
 
     const budget = await this.budgetModel.findOne({
-      user: userId,
+      user: new Types.ObjectId(userId),
       category,
       month,
       year,
@@ -147,7 +171,7 @@ export class BudgetsService {
     const endOfMonth = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
 
     const transactions = await this.transactionModel.find({
-      user: userId,
+      user: new Types.ObjectId(userId),
       category,
       type: 'expense',
       date: { $gte: startOfMonth, $lte: endOfMonth },

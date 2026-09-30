@@ -38,7 +38,10 @@ export class DebtsService {
     userId: string,
   ): Promise<Debt> {
     try {
-      const updateData = { ...updateDto };
+      const updateData: any = { ...updateDto };
+      if (updateData.dueDate !== undefined) {
+        updateData.isReminderSent = false;
+      }
 
       if (Types.ObjectId.isValid(id)) {
         const updated = await this.debtModel
@@ -118,33 +121,33 @@ export class DebtsService {
   }
 
   /**
-   * Runs every hour. Sends debt due reminders to users
-   * whose notificationHour matches the current Vietnam local hour.
+   * Runs every minute. Sends debt due reminders to users
+   * whose notificationHour & notificationMinute match the current Vietnam local time.
    */
-  @Cron('0 * * * *', { name: 'debt-due-reminder' })
+  @Cron('* * * * *', { name: 'debt-due-reminder' })
   async checkDebtDueReminders() {
-    const vnHour = (new Date().getUTCHours() + 7) % 24;
-    this.logger.log(`⏰ Debt due reminder check — Vietnam hour: ${vnHour}`);
     try {
-      // Today range in UTC (accounting for UTC+7)
       const now = new Date();
       const vnNow = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+      const vnHour = vnNow.getUTCHours();
+      const vnMinute = vnNow.getUTCMinutes();
       const vnYear = vnNow.getUTCFullYear();
       const vnMonth = vnNow.getUTCMonth();
       const vnDay = vnNow.getUTCDate();
+
       const todayStartUTC = new Date(Date.UTC(vnYear, vnMonth, vnDay, -7, 0, 0));
       const todayEndUTC = new Date(Date.UTC(vnYear, vnMonth, vnDay, 17, 0, 0) - 1);
 
-      // Find debts due today
+      // Find debts due today that haven't had a reminder sent yet
       const dueTodayDebts = await this.debtModel
         .find({
           isPaid: false,
+          isReminderSent: { $ne: true },
           dueDate: { $gte: todayStartUTC, $lte: todayEndUTC },
         })
         .exec();
 
       if (dueTodayDebts.length === 0) return;
-      this.logger.log(`Found ${dueTodayDebts.length} debt(s) due today.`);
 
       let success = 0;
       let failed = 0;
@@ -153,13 +156,15 @@ export class DebtsService {
         try {
           const userId = String(debt.user);
 
-          // Check if this user's notificationHour matches current VN hour
+          // Check if this user's scheduled notification time matches current VN time
           const user = await this.userModel
             .findById(userId)
-            .select('notificationHour')
+            .select('notificationHour notificationMinute')
             .lean();
           const userHour = user?.notificationHour ?? 23;
-          if (userHour !== vnHour) continue;
+          const userMinute = user?.notificationMinute ?? 0;
+
+          if (userHour !== vnHour || userMinute !== vnMinute) continue;
 
           const isLoan = debt.type === 'loan';
           const personName = debt.personName || 'ai đó';
@@ -174,15 +179,22 @@ export class DebtsService {
             data: { type: 'debt_reminder', debtId: String(debt._id) },
           });
 
-          if (result.success) success++;
-          else failed++;
+          if (result.success) {
+            success++;
+            debt.isReminderSent = true;
+            await debt.save();
+          } else {
+            failed++;
+          }
         } catch (err: any) {
           this.logger.error(`Failed to send reminder for debt ${debt._id}: ${err?.message}`);
           failed++;
         }
       }
 
-      this.logger.log(`Debt reminders done — ✅ ${success} succeeded, ❌ ${failed} failed`);
+      if (success > 0 || failed > 0) {
+        this.logger.log(`Debt reminders at ${vnHour}:${String(vnMinute).padStart(2, '0')} — ✅ ${success} succeeded, ❌ ${failed} failed`);
+      }
     } catch (error) {
       this.logger.error('Error checking debt due reminders', error);
     }

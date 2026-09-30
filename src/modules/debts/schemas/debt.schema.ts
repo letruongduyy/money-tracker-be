@@ -78,6 +78,9 @@ export class Debt {
   @Prop({ default: false })
   isPaid: boolean;
 
+  @Prop({ default: false })
+  isReminderSent: boolean;
+
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   user: Types.ObjectId;
 }

@@ -17,13 +17,12 @@ export class ReportsService {
   ) {}
 
   /**
-   * Runs every hour. Sends daily spending summary to users
-   * whose notificationHour matches the current Vietnam local hour.
+   * Runs every minute. Sends daily spending summary to users
+   * whose notificationHour & notificationMinute match current Vietnam local time.
    */
-  @Cron("0 * * * *", { name: "daily-report" })
+  @Cron("* * * * *", { name: "daily-report" })
   async sendDailyReports() {
-    const vnHour = this.getVietnamHour();
-    this.logger.log(`⏰ Daily report check — Vietnam hour: ${vnHour}`);
+    const { hour, minute, dateStr } = this.getVietnamTime();
 
     const now = new Date();
     const todayStart = new Date(now);
@@ -32,28 +31,28 @@ export class ReportsService {
     const todayEnd = new Date(now);
     todayEnd.setHours(23, 59, 59, 999);
 
-    await this.generateAndSendReports("daily", todayStart, todayEnd, vnHour);
+    await this.generateAndSendReports("daily", todayStart, todayEnd, hour, minute, dateStr);
   }
 
   /**
-   * Runs every hour. Reminds users to log transactions
-   * when current Vietnam hour matches their notificationHour.
+   * Runs every minute. Reminds users to log transactions
+   * when current Vietnam hour & minute match their notification settings.
    */
-  @Cron("1 * * * *", { name: "daily-transaction-reminder" })
+  @Cron("* * * * *", { name: "daily-transaction-reminder" })
   async sendDailyTransactionReminder() {
-    const vnHour = this.getVietnamHour();
-    this.logger.log(`⏰ Transaction reminder check — Vietnam hour: ${vnHour}`);
+    const { hour, minute, dateStr } = this.getVietnamTime();
 
     const users = await this.userModel
       .find({
         fcmToken: { $exists: true, $ne: "" },
-        notificationHour: vnHour,
+        notificationHour: hour,
+        notificationMinute: minute,
+        lastDailyReminderDate: { $ne: dateStr },
       })
-      .select("_id name fcmToken notificationHour")
+      .select("_id name fcmToken notificationHour notificationMinute")
       .lean();
 
     if (users.length === 0) return;
-    this.logger.log(`Found ${users.length} user(s) to remind at hour ${vnHour}`);
 
     let success = 0;
     let failed = 0;
@@ -66,8 +65,15 @@ export class ReportsService {
           data: { type: "daily_transaction_reminder" },
         });
 
-        if (result.success) success++;
-        else failed++;
+        if (result.success) {
+          success++;
+          await this.userModel.updateOne(
+            { _id: user._id },
+            { $set: { lastDailyReminderDate: dateStr } },
+          );
+        } else {
+          failed++;
+        }
       } catch (err: any) {
         this.logger.error(
           `Failed to send reminder to user ${user._id}: ${err?.message || err}`,
@@ -76,9 +82,11 @@ export class ReportsService {
       }
     }
 
-    this.logger.log(
-      `Daily transaction reminder done — ✅ ${success} succeeded, ❌ ${failed} failed`,
-    );
+    if (success > 0 || failed > 0) {
+      this.logger.log(
+        `Daily transaction reminder at ${hour}:${String(minute).padStart(2, '0')} — ✅ ${success} succeeded, ❌ ${failed} failed`,
+      );
+    }
   }
 
   /**
@@ -123,20 +131,28 @@ export class ReportsService {
     startDate: Date,
     endDate: Date,
     notificationHour?: number,
+    notificationMinute?: number,
+    dateStr?: string,
   ) {
-    // Filter by notificationHour if provided (per-user schedule)
+    // Filter by notificationHour & notificationMinute if provided (per-user schedule)
     const query: any = { fcmToken: { $exists: true, $ne: "" } };
     if (notificationHour !== undefined) {
       query.notificationHour = notificationHour;
     }
+    if (notificationMinute !== undefined) {
+      query.notificationMinute = notificationMinute;
+    }
+    if (dateStr && period === "daily") {
+      query.lastDailyReportDate = { $ne: dateStr };
+    }
 
     const users = await this.userModel
       .find(query)
-      .select("_id name fcmToken notificationHour")
+      .select("_id name fcmToken notificationHour notificationMinute")
       .lean();
 
     if (users.length === 0) return;
-    this.logger.log(`Found ${users.length} user(s) for ${period} report at hour ${notificationHour ?? 'any'}`);
+    this.logger.log(`Found ${users.length} user(s) for ${period} report at ${notificationHour ?? 'any'}:${notificationMinute !== undefined ? String(notificationMinute).padStart(2, '0') : 'any'}`);
 
     let successUsers = 0;
     let failedUsers = 0;
@@ -164,8 +180,17 @@ export class ReportsService {
           },
         });
 
-        if (result.success) successUsers++;
-        else failedUsers++;
+        if (result.success) {
+          successUsers++;
+          if (dateStr && period === "daily") {
+            await this.userModel.updateOne(
+              { _id: user._id },
+              { $set: { lastDailyReportDate: dateStr } },
+            );
+          }
+        } else {
+          failedUsers++;
+        }
       } catch (err: any) {
         this.logger.error(
           `Failed to send ${period} report to user ${user._id}: ${err?.message || err}`,
@@ -174,17 +199,25 @@ export class ReportsService {
       }
     }
 
-    this.logger.log(
-      `${period.charAt(0).toUpperCase() + period.slice(1)} report done — ✅ ${successUsers} succeeded, ❌ ${failedUsers} failed`,
-    );
+    if (successUsers > 0 || failedUsers > 0) {
+      this.logger.log(
+        `${period.charAt(0).toUpperCase() + period.slice(1)} report done — ✅ ${successUsers} succeeded, ❌ ${failedUsers} failed`,
+      );
+    }
   }
 
   // ─── helpers ────────────────────────────────────────────────────────────────
 
-  /** Returns the current hour in Vietnam time (UTC+7), 0–23 */
-  private getVietnamHour(): number {
+  /** Returns current Vietnam time (UTC+7): hour (0-23), minute (0-59), and dateStr (YYYY-MM-DD) */
+  private getVietnamTime(): { hour: number; minute: number; dateStr: string } {
     const now = new Date();
-    return (now.getUTCHours() + 7) % 24;
+    const vnDate = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+    const hour = vnDate.getUTCHours();
+    const minute = vnDate.getUTCMinutes();
+    const year = vnDate.getUTCFullYear();
+    const month = String(vnDate.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(vnDate.getUTCDate()).padStart(2, "0");
+    return { hour, minute, dateStr: `${year}-${month}-${day}` };
   }
 
   private formatVnd(amount: number): string {

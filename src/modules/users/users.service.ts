@@ -227,6 +227,8 @@ export class UsersService {
         totalLoan,
         totalDebt,
       },
+      notificationHour: user.notificationHour ?? 23,
+      notificationMinute: user.notificationMinute ?? 0,
     };
   }
 
@@ -266,13 +268,19 @@ export class UsersService {
     return usersWithStats;
   }
 
-  async updateSettings(userId: string, settings: { notificationHour?: number }) {
+  async updateSettings(userId: string, settings: { notificationHour?: number; notificationMinute?: number }) {
     const update: any = {};
     if (settings.notificationHour !== undefined) {
       if (settings.notificationHour < 0 || settings.notificationHour > 23) {
         throw new Error('notificationHour must be between 0 and 23');
       }
       update.notificationHour = settings.notificationHour;
+    }
+    if (settings.notificationMinute !== undefined) {
+      if (settings.notificationMinute < 0 || settings.notificationMinute > 59) {
+        throw new Error('notificationMinute must be between 0 and 59');
+      }
+      update.notificationMinute = settings.notificationMinute;
     }
     return this.userModel
       .findByIdAndUpdate(userId, update, { returnDocument: 'after' })
