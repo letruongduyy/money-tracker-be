@@ -23,6 +23,7 @@ import { BudgetsModule } from "./modules/budgets/budgets.module";
 import { CredentialsModule } from "./modules/credentials/credentials.module";
 import { DebtsModule } from "./modules/debts/debts.module";
 import { SalariesModule } from "./modules/salaries/salaries.module";
+import { FeedbacksModule } from "./modules/feedbacks/feedbacks.module";
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { SalariesModule } from "./modules/salaries/salaries.module";
     CredentialsModule,
     DebtsModule,
     SalariesModule,
+    FeedbacksModule,
   ],
   controllers: [AppController],
   providers: [AppService],
