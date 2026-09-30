@@ -4,6 +4,7 @@ import { BudgetsController } from './budgets.controller';
 import { BudgetsService } from './budgets.service';
 import { Budget, BudgetSchema } from './schemas/budget.schema';
 import { Transaction, TransactionSchema } from '../transactions/schemas/transaction.schema';
+import { User, UserSchema } from '../users/schemas/user.schema';
 import { PushModule } from '../push/push.module';
 
 @Module({
@@ -11,6 +12,7 @@ import { PushModule } from '../push/push.module';
     MongooseModule.forFeature([
       { name: Budget.name, schema: BudgetSchema },
       { name: Transaction.name, schema: TransactionSchema },
+      { name: User.name, schema: UserSchema },
     ]),
     PushModule,
   ],

@@ -31,6 +31,9 @@ export class User {
 
   @Prop({ default: '' })
   lastDailyReportDate: string; // YYYY-MM-DD to prevent duplicate daily report pushes
+
+  @Prop({ default: true })
+  budgetAlertsEnabled: boolean; // Push alerts when spending reaches 80%/100% of a budget
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

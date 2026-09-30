@@ -4,6 +4,7 @@ import { Model, Types } from 'mongoose';
 import { Budget, BudgetDocument } from './schemas/budget.schema';
 import { CreateBudgetDto } from './dto/create-budget.dto';
 import { Transaction, TransactionDocument } from '../transactions/schemas/transaction.schema';
+import { User, UserDocument } from '../users/schemas/user.schema';
 import { PushService } from '../push/push.service';
 
 const CategoryDisplayNames: Record<string, string> = {
@@ -27,6 +28,7 @@ export class BudgetsService {
   constructor(
     @InjectModel(Budget.name) private budgetModel: Model<BudgetDocument>,
     @InjectModel(Transaction.name) private transactionModel: Model<TransactionDocument>,
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
     private pushService: PushService,
   ) {}
 
@@ -128,6 +130,10 @@ export class BudgetsService {
     });
 
     if (!budget) return;
+
+    // Respect the user-level notification toggle (default on)
+    const user = await this.userModel.findById(userId).select('budgetAlertsEnabled');
+    if (user && user.budgetAlertsEnabled === false) return;
 
     const totalSpending = await this.calculateCategorySpending(userId, category, month, year);
     const categoryName = CategoryDisplayNames[category] || category;

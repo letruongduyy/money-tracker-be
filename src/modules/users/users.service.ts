@@ -268,7 +268,7 @@ export class UsersService {
     return usersWithStats;
   }
 
-  async updateSettings(userId: string, settings: { notificationHour?: number; notificationMinute?: number }) {
+  async updateSettings(userId: string, settings: { notificationHour?: number; notificationMinute?: number; budgetAlertsEnabled?: boolean }) {
     const update: any = {};
     if (settings.notificationHour !== undefined) {
       if (settings.notificationHour < 0 || settings.notificationHour > 23) {
@@ -281,6 +281,12 @@ export class UsersService {
         throw new Error('notificationMinute must be between 0 and 59');
       }
       update.notificationMinute = settings.notificationMinute;
+    }
+    if (settings.budgetAlertsEnabled !== undefined) {
+      if (typeof settings.budgetAlertsEnabled !== 'boolean') {
+        throw new Error('budgetAlertsEnabled must be a boolean');
+      }
+      update.budgetAlertsEnabled = settings.budgetAlertsEnabled;
     }
     return this.userModel
       .findByIdAndUpdate(userId, update, { returnDocument: 'after' })
