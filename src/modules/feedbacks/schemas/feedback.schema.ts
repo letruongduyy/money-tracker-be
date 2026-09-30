@@ -8,7 +8,7 @@ export type FeedbackCategory = (typeof FeedbackCategories)[number];
 
 @Schema({ timestamps: true })
 export class Feedback {
-  @Prop({ required: true, index: true })
+  @Prop({ required: true, index: true, ref: 'User' })
   user: Types.ObjectId;
 
   @Prop({ required: true, min: 1, max: 5 })
