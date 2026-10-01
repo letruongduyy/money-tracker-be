@@ -89,12 +89,15 @@ export class UsersService {
     }
 
     let cashTotal = 0;
+    let savingsTotal = 0;
     let goldTotal = 0;
     let currencyTotal = 0;
 
     for (const asset of assets) {
       if (asset.type === 'cash') {
         cashTotal += asset.amount;
+      } else if (asset.type === 'savings') {
+        savingsTotal += asset.amount;
       } else if (asset.type === 'gold') {
         const rawSymbol = asset.symbol || 'SJ9999';
         const symbol = rawSymbol.split(':')[0];
@@ -131,8 +134,8 @@ export class UsersService {
       }
     }
 
-    const totalAssetsValuation = cashTotal + goldTotal + currencyTotal;
-    const totalBalance = balance + totalAssetsValuation;
+    const totalAssetsValuation = cashTotal + savingsTotal + goldTotal + currencyTotal;
+    const totalBalance = totalAssetsValuation;
 
     // Calculate unpaid debts
     let totalLoan = 0;
@@ -140,7 +143,7 @@ export class UsersService {
 
     const calculateItemValuation = (item: any) => {
       if (!item) return 0;
-      if (item.assetType === 'cash') {
+      if (item.assetType === 'cash' || item.assetType === 'savings') {
         return item.amount || 0;
       } else if (item.assetType === 'gold') {
         const rawSymbol = item.assetSymbol || 'SJ9999';
@@ -201,14 +204,14 @@ export class UsersService {
       }
     }
 
-    const netWorthWithDebts = totalBalance + totalLoan - totalDebt;
+    const netWorthWithDebts = totalAssetsValuation + totalLoan - totalDebt;
 
     return {
       name: user.name,
       avatar: user.avatar,
       username: user.username,
-      netWorth: totalBalance,
-      totalBalance,
+      netWorth: netWorthWithDebts,
+      totalBalance: netWorthWithDebts,
       netWorthWithDebts,
       transactions: {
         income,
@@ -219,6 +222,7 @@ export class UsersService {
         totalValuation: totalAssetsValuation,
         breakdown: {
           cash: cashTotal,
+          savings: savingsTotal,
           gold: goldTotal,
           currency: currencyTotal,
         },
