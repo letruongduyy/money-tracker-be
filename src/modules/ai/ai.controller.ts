@@ -30,4 +30,19 @@ export class AiController {
     const userId = req.user?.userId;
     return this.aiService.parseNoteFromText(text, clientTime || new Date().toISOString(), userId);
   }
+
+  @Post("smart-parse")
+  async smartParse(
+    @Body("text") text: string,
+    @Body("clientTime") clientTime: string,
+  ) {
+    if (!text || text.trim() === "") {
+      return { status: false, message: "Text is required" };
+    }
+
+    return this.aiService.smartParse(
+      text,
+      clientTime || new Date().toISOString(),
+    );
+  }
 }

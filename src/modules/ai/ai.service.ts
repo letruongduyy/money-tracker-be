@@ -1,4 +1,5 @@
 import { Injectable, InternalServerErrorException, Logger } from "@nestjs/common";
+import { randomUUID } from "node:crypto";
 import { TransactionsService } from "../transactions/transactions.service";
 import { NotesService } from "../notes/notes.service";
 
@@ -209,6 +210,327 @@ Ví dụ định dạng mong muốn:
         "Failed to parse note with AI: " + error.message,
       );
     }
+  }
+
+  /**
+   * Classify a free-form spoken sentence into one of 7 intents and extract
+   * preview fields WITHOUT saving anything. The client shows a preview and
+   * saves via the normal local-first flows after the user confirms.
+   */
+  async smartParse(text: string, clientTime: string) {
+    const now = clientTime || new Date().toISOString();
+
+    const prompt = `
+Bạn là trợ lý AI phân loại & bóc tách dữ liệu cho ứng dụng quản lý chi tiêu cá nhân.
+Câu người dùng (có thể tiếng Việt hoặc tiếng Anh): "${text}"
+Thời gian hiện tại của người dùng (phía client): ${now}
+
+Hãy xác định câu trên thuộc ĐÚNG MỘT trong các loại sau, rồi bóc tách dữ liệu tương ứng:
+- "transaction": chi tiêu hoặc thu nhập một lần (mua gì, trả gì, ăn gì, nhận lương, được cho tiền...)
+- "recurring": giao dịch định kỳ lặp lại (hằng ngày/tuần/tháng/năm; VD "mỗi tháng trả tiền nhà 5 triệu", "hàng tuần đổ xăng 200k")
+- "note": ghi chú/ghi nhớ thông thường không kèm mốc thời gian nhắc (VD "bộ phim này hay quá", "mua sách kinh tế")
+- "reminder": nhắc nhở CÓ mốc thời gian (VD "nhắc tôi 15 phút nữa gọi mẹ", "hẹn mai 9h họp", "báo thức 6h sáng mai")
+- "debt": vay nợ — gồm cả "tôi đi vay" và "tôi cho vay/ai nợ tôi"
+- "budget": đặt ngân sách/hạn mức chi tiêu cho một danh mục (VD "đặt ngân sách ăn uống tháng này 3 triệu")
+- "asset": thêm tài sản (tiền mặt, vàng, ngoại tệ, sổ tiết kiệm; VD "tôi có 2 chỉ vàng SJC", "mở sổ tiết kiệm 50 triệu kỳ hạn 6 tháng")
+- "unknown": không đủ rõ ràng để phân loại
+
+QUY TẮC BÓC TÁCH THEO TỪNG LOẠI (đặt trong "fields"):
+
+A. transaction / recurring:
+- "amount": số nguyên. Quy đổi tiếng lóng: "50k"/"50 nghìn"/"50 ngàn" -> 50000; "1 củ"/"1 triệu"/"1tr" -> 1000000; "rưỡi" cộng thêm nửa đơn vị (VD "1 triệu rưỡi" -> 1500000).
+- "type": "expense" (chi tiêu) hoặc "income" (thu nhập).
+- "paymentMethod": CHỈ CHỌN 1 TRONG: cash, card, e_wallet, bank_transfer (mặc định cash).
+- "category": CHỈ CHỌN 1 TRONG danh sách phù hợp với type:
+  + income: salary, freelance, gift, investment, other
+  + expense: food_and_dining, transport, shopping, entertainment, bills_and_utilities, health, education, baby, give_someone_money, save_money, other
+- "note": mô tả ngắn gọn mục đích (VD "Đi Bách Hóa Xanh").
+- "date": chuỗi ngày YYYY-MM-DD tính theo thời gian client ("hôm qua", "mai"...).
+- Riêng recurring THÊM: "frequency": daily|weekly|monthly|yearly, và "startDate": YYYY-MM-DD.
+
+B. note:
+- "title": tiêu đề ngắn gọn tóm tắt nội dung.
+- "content": nội dung đầy đủ (giữ nguyên ngôn ngữ người dùng nhập).
+
+C. reminder:
+- "title": tiêu đề ngắn (VD "Gọi mẹ").
+- "content": nội dung chi tiết.
+- "remindAt": thời điểm ISO 8601 tính chính xác từ thời gian client ${now} (VD client là 2026-06-05T15:45:00.000Z và nói "15 phút nữa" -> "2026-06-05T16:00:00.000Z").
+
+D. debt:
+- "type": "debt" nếu TÔI đi vay (tôi nợ người khác), "loan" nếu tôi cho người khác vay.
+- "personName": tên người liên quan.
+- "items": mảng các khoản [{ "assetType": cash|gold|currency, "amount": số, "assetSymbol": mã (VD "SJC", "USD"), "assetUnit": đơn vị (VD "chỉ", "lượng") }] — chỉ thêm assetSymbol/assetUnit khi là vàng hoặc ngoại tệ.
+- "startDate": YYYY-MM-DD (mặc định hôm nay), "dueDate": YYYY-MM-DD nếu có hẹn trả.
+- "note": ghi chú thêm nếu có.
+
+E. budget:
+- "category": danh mục ngân sách — ưu tiên khớp với danh sách expense ở trên nếu đúng nghĩa, ngược lại giữ nguyên cụm danh mục người dùng nói.
+- "amount": số nguyên dương.
+- "month": 1-12, "year": YYYY (mặc định tháng/năm hiện tại theo thời gian client nếu người dùng không nói rõ).
+
+F. asset:
+- "type": cash|gold|currency|savings.
+- "name": tên tài sản (VD "Tiền mặt", "Vàng SJC", "USD", "Sổ tiết kiệm VCB").
+- "amount": số lượng hoặc số tiền.
+- "symbol": mã (VD "SJC", "USD") nếu có; "unit": đơn vị (VD "chỉ", "lượng") nếu có.
+- "termMonths": kỳ hạn tính bằng tháng (chỉ savings); "interestRate": lãi suất %/năm (chỉ savings) nếu có.
+
+Nếu câu thiếu dữ liệu quan trọng (thiếu số tiền với transaction/recurring/budget/asset/debt, thiếu thông tin với debt), hãy trả về "unknown".
+
+CHỈ TRẢ VỀ ĐÚNG 1 ĐOẠN MÃ JSON hợp lệ, KHÔNG THÊM BẤT KỲ VĂN BẢN NÀO KHÁC BÊN NGOÀI JSON. Đừng dùng block code (\`\`\`json).
+Ví dụ định dạng mong muốn:
+{
+  "intent": "transaction",
+  "fields": {
+    "amount": 50000,
+    "type": "expense",
+    "paymentMethod": "cash",
+    "category": "shopping",
+    "note": "Đi bách hóa xanh",
+    "date": "${now.split("T")[0]}"
+  }
+}
+`;
+
+    const parsedData = await this.generateJson(prompt);
+    const result = this.sanitizeSmartParse(parsedData, text, now);
+    this.logger.log(`[Smart Parse] intent=${result.intent}`);
+    return { status: true, data: result };
+  }
+
+  private sanitizeSmartParse(raw: any, text: string, clientTime: string) {
+    const intents = [
+      "transaction",
+      "recurring",
+      "note",
+      "reminder",
+      "debt",
+      "budget",
+      "asset",
+    ];
+    let intent: string =
+      typeof raw?.intent === "string" ? raw.intent.trim().toLowerCase() : "";
+    if (!intents.includes(intent)) intent = "unknown";
+    const f = raw?.fields && typeof raw.fields === "object" ? raw.fields : {};
+
+    const unknown = { intent: "unknown", fields: { text } };
+
+    const textOf = (value: any, fallback: string): string =>
+      typeof value === "string" && value.trim() ? value.trim() : fallback;
+
+    const amountOf = (value: any): number => {
+      const n = Number(value);
+      return Number.isFinite(n) ? Math.abs(Math.round(n)) : 0;
+    };
+
+    const dateOf = (value: any): string => {
+      if (typeof value === "string" && value.trim()) {
+        const d = new Date(value);
+        if (!isNaN(d.getTime())) return d.toISOString().split("T")[0];
+      }
+      return this.clientDate(clientTime);
+    };
+
+    const paymentMethodOf = (value: any): string => {
+      const aliases: Record<string, string> = {
+        credit_card: "card",
+        transfer: "bank_transfer",
+        ewallet: "e_wallet",
+        "e-wallet": "e_wallet",
+      };
+      let v = typeof value === "string" ? value.trim().toLowerCase() : "";
+      v = aliases[v] ?? v;
+      return ["cash", "card", "e_wallet", "bank_transfer"].includes(v)
+        ? v
+        : "cash";
+    };
+
+    const categoryOf = (value: any, type: string): string => {
+      const income = ["salary", "freelance", "gift", "investment", "other"];
+      const expense = [
+        "food_and_dining",
+        "transport",
+        "shopping",
+        "entertainment",
+        "bills_and_utilities",
+        "health",
+        "education",
+        "baby",
+        "give_someone_money",
+        "save_money",
+        "other",
+      ];
+      const v = typeof value === "string" ? value.trim().toLowerCase() : "";
+      return (type === "income" ? income : expense).includes(v) ? v : "other";
+    };
+
+    switch (intent) {
+      case "transaction":
+      case "recurring": {
+        const type = f.type === "income" ? "income" : "expense";
+        const amount = amountOf(f.amount);
+        if (amount <= 0) return unknown;
+        const fields: any = {
+          amount,
+          type,
+          paymentMethod: paymentMethodOf(f.paymentMethod),
+          category: categoryOf(f.category, type),
+          note: textOf(f.note, text),
+          date: dateOf(f.date),
+        };
+        if (intent === "recurring") {
+          const frequencies = ["daily", "weekly", "monthly", "yearly"];
+          const freq =
+            typeof f.frequency === "string"
+              ? f.frequency.trim().toLowerCase()
+              : "";
+          fields.frequency = frequencies.includes(freq) ? freq : "monthly";
+          fields.startDate = dateOf(f.startDate || f.date);
+        }
+        return { intent, fields };
+      }
+      case "note": {
+        return {
+          intent,
+          fields: {
+            title: textOf(f.title, text.slice(0, 60)),
+            content: textOf(f.content, text),
+          },
+        };
+      }
+      case "reminder": {
+        const remindAt =
+          typeof f.remindAt === "string" ? new Date(f.remindAt) : null;
+        if (!remindAt || isNaN(remindAt.getTime())) {
+          // No usable time — keep the content as a plain note instead.
+          return {
+            intent: "note",
+            fields: {
+              title: textOf(f.title, text.slice(0, 60)),
+              content: textOf(f.content, text),
+            },
+          };
+        }
+        return {
+          intent,
+          fields: {
+            title: textOf(f.title, text.slice(0, 60)),
+            content: textOf(f.content, text),
+            remindAt: remindAt.toISOString(),
+          },
+        };
+      }
+      case "debt": {
+        const personName = textOf(f.personName, "");
+        const rawItems = Array.isArray(f.items) ? f.items : [];
+        const items = rawItems
+          .map((it: any) => {
+            const at =
+              typeof it?.assetType === "string"
+                ? it.assetType.trim().toLowerCase()
+                : "cash";
+            return {
+              id: randomUUID(),
+              assetType: ["cash", "gold", "currency"].includes(at)
+                ? at
+                : "cash",
+              amount: amountOf(it?.amount),
+              assetSymbol:
+                typeof it?.assetSymbol === "string" && it.assetSymbol.trim()
+                  ? it.assetSymbol.trim()
+                  : undefined,
+              assetUnit:
+                typeof it?.assetUnit === "string" && it.assetUnit.trim()
+                  ? it.assetUnit.trim()
+                  : undefined,
+            };
+          })
+          .filter((it: any) => it.amount > 0);
+        if (!personName || items.length === 0) return unknown;
+        const fields: any = {
+          type: f.type === "loan" ? "loan" : "debt",
+          personName,
+          items,
+          startDate: dateOf(f.startDate),
+        };
+        if (typeof f.dueDate === "string" && f.dueDate.trim()) {
+          const due = new Date(f.dueDate);
+          if (!isNaN(due.getTime())) {
+            fields.dueDate = due.toISOString().split("T")[0];
+          }
+        }
+        if (typeof f.note === "string" && f.note.trim()) {
+          fields.note = f.note.trim();
+        }
+        return { intent, fields };
+      }
+      case "budget": {
+        const amount = amountOf(f.amount);
+        if (amount <= 0) return unknown;
+        const now = new Date(clientTime);
+        const validNow = !isNaN(now.getTime());
+        const monthNum = Number(f.month);
+        const yearNum = Number(f.year);
+        const month =
+          Number.isInteger(monthNum) && monthNum >= 1 && monthNum <= 12
+            ? monthNum
+            : validNow
+              ? now.getUTCMonth() + 1
+              : new Date().getUTCMonth() + 1;
+        const year =
+          Number.isInteger(yearNum) && yearNum > 2000
+            ? yearNum
+            : validNow
+              ? now.getUTCFullYear()
+              : new Date().getUTCFullYear();
+        return {
+          intent,
+          fields: {
+            category: textOf(f.category, "other"),
+            amount,
+            month,
+            year,
+          },
+        };
+      }
+      case "asset": {
+        const assetTypes = ["cash", "gold", "currency", "savings"];
+        const amount = amountOf(f.amount);
+        if (amount <= 0) return unknown;
+        const at =
+          typeof f.type === "string" ? f.type.trim().toLowerCase() : "cash";
+        const fields: any = {
+          type: assetTypes.includes(at) ? at : "cash",
+          name: textOf(f.name, text.slice(0, 60)),
+          amount,
+        };
+        if (typeof f.symbol === "string" && f.symbol.trim()) {
+          fields.symbol = f.symbol.trim();
+        }
+        if (typeof f.unit === "string" && f.unit.trim()) {
+          fields.unit = f.unit.trim();
+        }
+        if (fields.type === "savings") {
+          const term = Number(f.termMonths);
+          if (Number.isFinite(term) && term > 0) {
+            fields.termMonths = Math.round(term);
+          }
+          const rate = Number(f.interestRate);
+          if (Number.isFinite(rate) && rate >= 0) {
+            fields.interestRate = rate;
+          }
+        }
+        return { intent, fields };
+      }
+      default:
+        return unknown;
+    }
+  }
+
+  private clientDate(clientTime: string): string {
+    const d = new Date(clientTime);
+    return (isNaN(d.getTime()) ? new Date() : d).toISOString().split("T")[0];
   }
 }
 
