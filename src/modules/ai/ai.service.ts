@@ -81,7 +81,11 @@ export class AiService {
     return cleaned;
   }
 
-  async parseTransactionFromNote(text: string, userId: string) {
+  async parseTransactionFromNote(
+    text: string,
+    userId: string,
+    clientTime?: string,
+  ) {
     try {
       // Common types and categories matched exactly with Schema Enums
       const types = "income, expense";
@@ -132,6 +136,22 @@ Ví dụ định dạng mong muốn:
         parsedData.paymentMethod = "card";
       if (parsedData.paymentMethod === "transfer")
         parsedData.paymentMethod = "bank_transfer";
+
+      // Combine parsed date with clientTime's hours & minutes if no specific time was provided
+      const clientDate = (clientTime && !isNaN(new Date(clientTime).getTime()))
+        ? new Date(clientTime)
+        : new Date();
+
+      if (parsedData.date) {
+        if (typeof parsedData.date === "string" && parsedData.date.length === 10) {
+          const [year, month, day] = parsedData.date.split("-").map(Number);
+          const combined = new Date(clientDate);
+          combined.setFullYear(year, month - 1, day);
+          parsedData.date = combined.toISOString();
+        }
+      } else {
+        parsedData.date = clientDate.toISOString();
+      }
 
       // Automatically save to MongoDB using TransactionsService
       const savedTransaction = await this.transactionsService.create(

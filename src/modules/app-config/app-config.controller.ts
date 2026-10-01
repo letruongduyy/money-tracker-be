@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Query, UseGuards, Body } from "@nestjs/common";
+import { Controller, Get, Post, Delete, Query, UseGuards, Body, Headers } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import {
   TransactionCategories,
@@ -43,36 +43,68 @@ export class AppConfigController {
   }
 
   @Get()
-  async getConfig() {
-    const typeLabels: Record<string, string> = {
-      [TransactionType.INCOME]: "Thu nhập",
-      [TransactionType.EXPENSE]: "Chi tiêu",
-    };
+  async getConfig(@Headers("accept-language") acceptLanguage?: string) {
+    const isEn = acceptLanguage?.trim().toLowerCase().startsWith("en") ?? false;
 
-    const paymentLabels: Record<string, string> = {
-      [PaymentMethod.CASH]: "Tiền mặt",
-      [PaymentMethod.CARD]: "Thẻ",
-      [PaymentMethod.E_WALLET]: "Ví điện tử",
-      [PaymentMethod.BANK_TRANSFER]: "Chuyển khoản",
-    };
+    const typeLabels: Record<string, string> = isEn
+      ? {
+          [TransactionType.INCOME]: "Income",
+          [TransactionType.EXPENSE]: "Expense",
+        }
+      : {
+          [TransactionType.INCOME]: "Thu nhập",
+          [TransactionType.EXPENSE]: "Chi tiêu",
+        };
 
-    const categoryLabels: Record<string, string> = {
-      salary: "Lương",
-      freelance: "Làm nghề tự do",
-      gift: "Quà tặng",
-      investment: "Đầu tư",
-      other: "Khác",
-      food_and_dining: "Ăn uống",
-      transport: "Di chuyển",
-      shopping: "Mua sắm",
-      entertainment: "Giải trí",
-      bills_and_utilities: "Hóa đơn & Tiện ích",
-      health: "Sức khỏe",
-      education: "Giáo dục",
-      baby: "Em bé",
-      give_someone_money: "Cho/tặng tiền",
-      save_money: "Tiết kiệm",
-    };
+    const paymentLabels: Record<string, string> = isEn
+      ? {
+          [PaymentMethod.CASH]: "Cash",
+          [PaymentMethod.CARD]: "Card",
+          [PaymentMethod.E_WALLET]: "E-Wallet",
+          [PaymentMethod.BANK_TRANSFER]: "Bank Transfer",
+        }
+      : {
+          [PaymentMethod.CASH]: "Tiền mặt",
+          [PaymentMethod.CARD]: "Thẻ",
+          [PaymentMethod.E_WALLET]: "Ví điện tử",
+          [PaymentMethod.BANK_TRANSFER]: "Chuyển khoản",
+        };
+
+    const categoryLabels: Record<string, string> = isEn
+      ? {
+          salary: "Salary",
+          freelance: "Freelance",
+          gift: "Gift",
+          investment: "Investment",
+          other: "Other",
+          food_and_dining: "Food & Dining",
+          transport: "Transportation",
+          shopping: "Shopping",
+          entertainment: "Entertainment",
+          bills_and_utilities: "Bills & Utilities",
+          health: "Health & Fitness",
+          education: "Education",
+          baby: "Baby & Kids",
+          give_someone_money: "Donation / Giving",
+          save_money: "Savings",
+        }
+      : {
+          salary: "Lương",
+          freelance: "Làm nghề tự do",
+          gift: "Quà tặng",
+          investment: "Đầu tư",
+          other: "Khác",
+          food_and_dining: "Ăn uống",
+          transport: "Di chuyển",
+          shopping: "Mua sắm",
+          entertainment: "Giải trí",
+          bills_and_utilities: "Hóa đơn & Tiện ích",
+          health: "Sức khỏe",
+          education: "Giáo dục",
+          baby: "Em bé",
+          give_someone_money: "Cho/tặng tiền",
+          save_money: "Tiết kiệm",
+        };
 
     const formatCategories = Object.entries(TransactionCategories).reduce(
       (acc, [type, categories]) => {

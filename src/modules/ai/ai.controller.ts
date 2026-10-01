@@ -8,13 +8,17 @@ export class AiController {
   constructor(private readonly aiService: AiService) {}
 
   @Post("parse")
-  async parseTransaction(@Body("text") text: string, @Req() req: any) {
+  async parseTransaction(
+    @Body("text") text: string,
+    @Body("clientTime") clientTime: string,
+    @Req() req: any,
+  ) {
     if (!text || text.trim() === "") {
       return { status: false, message: "Text is required" };
     }
 
     const userId = req.user?.userId;
-    return this.aiService.parseTransactionFromNote(text, userId);
+    return this.aiService.parseTransactionFromNote(text, userId, clientTime);
   }
 
   @Post("parse-note")
