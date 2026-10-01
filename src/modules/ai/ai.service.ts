@@ -225,7 +225,7 @@ Bạn là trợ lý AI phân loại & bóc tách dữ liệu cho ứng dụng qu
 Câu người dùng (có thể tiếng Việt hoặc tiếng Anh): "${text}"
 Thời gian hiện tại của người dùng (phía client): ${now}
 
-Hãy xác định câu trên thuộc ĐÚNG MỘT trong các loại sau, rồi bóc tách dữ liệu tương ứng:
+Một câu có thể chứa NHIỀU ý độc lập (nhiều giao dịch, vừa giao dịch vừa nhắc nhở...). Hãy tách câu thành các mục, mỗi mục phân loại vào ĐÚNG MỘT trong các loại sau:
 - "transaction": chi tiêu hoặc thu nhập một lần (mua gì, trả gì, ăn gì, nhận lương, được cho tiền...)
 - "recurring": giao dịch định kỳ lặp lại (hằng ngày/tuần/tháng/năm; VD "mỗi tháng trả tiền nhà 5 triệu", "hàng tuần đổ xăng 200k")
 - "note": ghi chú/ghi nhớ thông thường không kèm mốc thời gian nhắc (VD "bộ phim này hay quá", "mua sách kinh tế")
@@ -234,6 +234,12 @@ Hãy xác định câu trên thuộc ĐÚNG MỘT trong các loại sau, rồi b
 - "budget": đặt ngân sách/hạn mức chi tiêu cho một danh mục (VD "đặt ngân sách ăn uống tháng này 3 triệu")
 - "asset": thêm tài sản (tiền mặt, vàng, ngoại tệ, sổ tiết kiệm; VD "tôi có 2 chỉ vàng SJC", "mở sổ tiết kiệm 50 triệu kỳ hạn 6 tháng")
 - "unknown": không đủ rõ ràng để phân loại
+
+QUY TẮC TÁCH MỤC:
+- Mỗi ý độc lập là một mục riêng, tối đa 5 mục.
+- Câu chỉ có 1 ý thì trả về mảng đúng 1 mục.
+- Chỉ dùng "unknown" khi TOÀN BỘ câu không phân loại được; khi đó trả về đúng 1 mục unknown với fields {"text": "<câu gốc>"} và KHÔNG tạo mục khác.
+- Mục nào thiếu dữ liệu quan trọng (thiếu số tiền với transaction/recurring/budget/asset/debt, thiếu thông tin với debt) thì BỎ mục đó, không đoán bừa.
 
 QUY TẮC BÓC TÁCH THEO TỪNG LOẠI (đặt trong "fields"):
 
@@ -276,30 +282,67 @@ F. asset:
 - "symbol": mã (VD "SJC", "USD") nếu có; "unit": đơn vị (VD "chỉ", "lượng") nếu có.
 - "termMonths": kỳ hạn tính bằng tháng (chỉ savings); "interestRate": lãi suất %/năm (chỉ savings) nếu có.
 
-Nếu câu thiếu dữ liệu quan trọng (thiếu số tiền với transaction/recurring/budget/asset/debt, thiếu thông tin với debt), hãy trả về "unknown".
-
 CHỈ TRẢ VỀ ĐÚNG 1 ĐOẠN MÃ JSON hợp lệ, KHÔNG THÊM BẤT KỲ VĂN BẢN NÀO KHÁC BÊN NGOÀI JSON. Đừng dùng block code (\`\`\`json).
-Ví dụ định dạng mong muốn:
+Định dạng mong muốn:
 {
-  "intent": "transaction",
-  "fields": {
-    "amount": 50000,
-    "type": "expense",
-    "paymentMethod": "cash",
-    "category": "shopping",
-    "note": "Đi bách hóa xanh",
-    "date": "${now.split("T")[0]}"
-  }
+  "items": [
+    {
+      "intent": "transaction",
+      "fields": {
+        "amount": 50000,
+        "type": "expense",
+        "paymentMethod": "cash",
+        "category": "shopping",
+        "note": "Đi bách hóa xanh",
+        "date": "${now.split("T")[0]}"
+      }
+    },
+    {
+      "intent": "reminder",
+      "fields": {
+        "title": "Họp",
+        "content": "Mai đi họp lúc 9 giờ",
+        "remindAt": "${now.split("T")[0]}T09:00:00.000Z"
+      }
+    }
+  ]
 }
 `;
 
     const parsedData = await this.generateJson(prompt);
-    const result = this.sanitizeSmartParse(parsedData, text, now);
-    this.logger.log(`[Smart Parse] intent=${result.intent}`);
-    return { status: true, data: result };
+    const items = this.sanitizeSmartParse(parsedData, text, now);
+    this.logger.log(
+      `[Smart Parse] items=${items.map((it: any) => it.intent).join(",")}`,
+    );
+    // Top-level intent/fields mirror the first item so older app builds
+    // (which read a single intent) keep working.
+    return {
+      status: true,
+      data: { items, intent: items[0].intent, fields: items[0].fields },
+    };
   }
 
   private sanitizeSmartParse(raw: any, text: string, clientTime: string) {
+    const rawItems = Array.isArray(raw?.items)
+      ? raw.items
+      : raw?.intent
+        ? [raw]
+        : [];
+    const items: any[] = rawItems
+      .slice(0, 5)
+      .map((it: any) =>
+        this.sanitizeIntentFields(it?.intent, it?.fields, text, clientTime),
+      )
+      .filter((it: any) => it !== null);
+    return items.length > 0 ? items : [{ intent: "unknown", fields: { text } }];
+  }
+
+  private sanitizeIntentFields(
+    rawIntent: any,
+    f: any,
+    text: string,
+    clientTime: string,
+  ): { intent: string; fields: any } | null {
     const intents = [
       "transaction",
       "recurring",
@@ -309,12 +352,10 @@ Ví dụ định dạng mong muốn:
       "budget",
       "asset",
     ];
-    let intent: string =
-      typeof raw?.intent === "string" ? raw.intent.trim().toLowerCase() : "";
-    if (!intents.includes(intent)) intent = "unknown";
-    const f = raw?.fields && typeof raw.fields === "object" ? raw.fields : {};
-
-    const unknown = { intent: "unknown", fields: { text } };
+    const intent: string =
+      typeof rawIntent === "string" ? rawIntent.trim().toLowerCase() : "";
+    if (!intents.includes(intent)) return null;
+    if (!f || typeof f !== "object") f = {};
 
     const textOf = (value: any, fallback: string): string =>
       typeof value === "string" && value.trim() ? value.trim() : fallback;
@@ -370,7 +411,7 @@ Ví dụ định dạng mong muốn:
       case "recurring": {
         const type = f.type === "income" ? "income" : "expense";
         const amount = amountOf(f.amount);
-        if (amount <= 0) return unknown;
+        if (amount <= 0) return null;
         const fields: any = {
           amount,
           type,
@@ -447,7 +488,7 @@ Ví dụ định dạng mong muốn:
             };
           })
           .filter((it: any) => it.amount > 0);
-        if (!personName || items.length === 0) return unknown;
+        if (!personName || items.length === 0) return null;
         const fields: any = {
           type: f.type === "loan" ? "loan" : "debt",
           personName,
@@ -467,7 +508,7 @@ Ví dụ định dạng mong muốn:
       }
       case "budget": {
         const amount = amountOf(f.amount);
-        if (amount <= 0) return unknown;
+        if (amount <= 0) return null;
         const now = new Date(clientTime);
         const validNow = !isNaN(now.getTime());
         const monthNum = Number(f.month);
@@ -497,7 +538,7 @@ Ví dụ định dạng mong muốn:
       case "asset": {
         const assetTypes = ["cash", "gold", "currency", "savings"];
         const amount = amountOf(f.amount);
-        if (amount <= 0) return unknown;
+        if (amount <= 0) return null;
         const at =
           typeof f.type === "string" ? f.type.trim().toLowerCase() : "cash";
         const fields: any = {
@@ -524,7 +565,7 @@ Ví dụ định dạng mong muốn:
         return { intent, fields };
       }
       default:
-        return unknown;
+        return null;
     }
   }
 
