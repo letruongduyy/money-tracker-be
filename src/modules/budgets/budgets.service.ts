@@ -104,13 +104,7 @@ export class BudgetsService {
     const filter: any = { user: new Types.ObjectId(userId) };
     if (month !== undefined) filter.month = month;
     if (year !== undefined) filter.year = year;
-    const budgets = await this.budgetModel.find(filter).sort({ category: 1 });
-    this.logger.log(
-      `[findAll] user=${userId} filter=${JSON.stringify(filter)} -> ${budgets.length} docs: ${budgets
-        .map((b) => `${b.category}=${b.amount} (${b.month}/${b.year})`)
-        .join(', ')}`,
-    );
-    return budgets;
+    return this.budgetModel.find(filter).sort({ category: 1 });
   }
 
   async remove(id: string, userId: string): Promise<any> {
