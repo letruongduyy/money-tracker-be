@@ -4,6 +4,29 @@ import { Injectable, HttpException, HttpStatus } from "@nestjs/common";
 export class GoldService {
   private readonly API_URL = "https://www.vang.today/api/prices";
 
+  async getGoldTypes(): Promise<Array<{ code: string; name: string }>> {
+    try {
+      const response = await fetch(this.API_URL);
+      if (!response.ok) {
+        throw new HttpException(
+          "Failed to fetch gold types",
+          HttpStatus.BAD_GATEWAY,
+        );
+      }
+      const data = await response.json();
+      const prices = data?.prices || {};
+
+      return Object.entries(prices).map(([code, val]: [string, any]) => ({
+        code,
+        name: val?.name || code,
+      }));
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "External API Error";
+      throw new HttpException(message, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
   async getGoldPrices(type: string = "SJL1L10", days: number = 7) {
     try {
       const response = await fetch(`${this.API_URL}?type=${type}&days=${days}`);

@@ -5,6 +5,11 @@ import { GoldService } from "./gold.service";
 export class GoldController {
   constructor(private readonly goldService: GoldService) {}
 
+  @Get("types")
+  async getGoldTypes() {
+    return this.goldService.getGoldTypes();
+  }
+
   @Get("prices")
   async getPrices(
     @Query("type") type?: string,
