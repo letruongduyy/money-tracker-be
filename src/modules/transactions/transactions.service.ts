@@ -44,8 +44,12 @@ export class TransactionsService {
     return tx;
   }
 
-  findAll(userId: string, month?: number, year?: number, sortBy: string = 'date', order: string = 'desc') {
+  findAll(userId: string, month?: number, year?: number, sortBy: string = 'date', order: string = 'desc', category?: string) {
     const filter: any = { user: userId };
+
+    if (category) {
+      filter.category = category;
+    }
 
     if (year) {
       const startDate = new Date(year, (month ?? 1) - 1, 1);

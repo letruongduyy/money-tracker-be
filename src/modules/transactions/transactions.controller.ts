@@ -57,6 +57,7 @@ export class TransactionsController {
     @Req() req,
     @Query('month') month?: string,
     @Query('year') year?: string,
+    @Query('category') category?: string,
     @Query('sortBy') sortBy?: string,
     @Query('order') order?: string,
   ) {
@@ -66,6 +67,7 @@ export class TransactionsController {
       year ? parseInt(year) : undefined,
       sortBy,
       order,
+      category,
     );
   }
 
