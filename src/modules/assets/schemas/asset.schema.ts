@@ -39,6 +39,9 @@ export class Asset {
   @Prop()
   interestRate?: number;
 
+  @Prop()
+  valuation?: number;
+
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   user: Types.ObjectId;
 }

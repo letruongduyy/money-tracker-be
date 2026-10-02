@@ -3,12 +3,14 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Asset, AssetDocument } from './schemas/asset.schema';
 import { CreateAssetDto, UpdateAssetDto } from './dto/asset.dto';
+import { GoldService } from '../gold/gold.service';
 
 @Injectable()
 export class AssetsService {
   constructor(
     @InjectModel(Asset.name)
     private assetModel: Model<AssetDocument>,
+    private goldService: GoldService,
   ) {}
 
   async mergeOrCreate(data: CreateAssetDto, userId: string): Promise<AssetDocument> {
@@ -86,7 +88,67 @@ export class AssetsService {
   }
 
   async findAll(userId: string) {
-    return this.assetModel.find({ user: userId }).sort({ updatedAt: -1 });
+    const assets = await this.assetModel.find({ user: userId }).sort({ updatedAt: -1 });
+    return this.enrichWithValuations(assets);
+  }
+
+  private async enrichWithValuations(assets: AssetDocument[]) {
+    if (!assets || assets.length === 0) return [];
+
+    let goldPrices: Record<string, any> = {};
+    let currencyRates: Array<any> = [];
+
+    const hasGold = assets.some((a) => a.type === 'gold');
+    const hasCurrency = assets.some((a) => a.type === 'currency');
+
+    if (hasGold) {
+      try {
+        const pricesRes = await fetch('https://www.vang.today/api/prices');
+        if (pricesRes.ok) {
+          const pricesData = await pricesRes.json();
+          goldPrices = pricesData?.prices || {};
+        }
+      } catch (err) {
+        console.error('Error fetching gold prices for asset valuation:', err);
+      }
+    }
+
+    if (hasCurrency) {
+      try {
+        const currData = await this.goldService.getCurrencyRates();
+        currencyRates = currData?.rates || [];
+      } catch (err) {
+        console.error('Error fetching currency rates for asset valuation:', err);
+      }
+    }
+
+    return assets.map((asset) => {
+      const obj = asset.toObject ? asset.toObject() : { ...asset };
+      let valuation = 0;
+
+      if (asset.type === 'cash' || asset.type === 'savings') {
+        valuation = Number(asset.amount) || 0;
+      } else if (asset.type === 'gold') {
+        const rawSymbol = asset.symbol || 'SJ9999';
+        const cleanSymbol = rawSymbol.split(':')[0];
+        const priceEntry = goldPrices[cleanSymbol] || (Object.keys(goldPrices).length > 0 ? Object.values(goldPrices)[0] : null);
+        const buyPrice = priceEntry?.buy ? parseFloat(String(priceEntry.buy).replace(/,/g, '')) : 0;
+
+        const isChi = asset.unit === 'chi' || (asset.symbol && asset.symbol.split(':').pop() === 'chi');
+        const tael = isChi ? asset.amount / 10 : asset.amount;
+        valuation = buyPrice > 0 ? Math.round(tael * buyPrice) : 0;
+      } else if (asset.type === 'currency') {
+        const sym = asset.symbol || 'USD';
+        const rateEntry = currencyRates.find((r) => r.currencyCode === sym);
+        const sellRate = rateEntry?.sell ? parseFloat(String(rateEntry.sell).replace(/,/g, '')) : 0;
+        valuation = sellRate > 0 ? Math.round(asset.amount * sellRate) : 0;
+      }
+
+      return {
+        ...obj,
+        valuation,
+      };
+    });
   }
 
   async update(id: string, data: UpdateAssetDto, userId: string) {
